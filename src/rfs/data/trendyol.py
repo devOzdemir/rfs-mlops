@@ -1,4 +1,3 @@
-# Trendyol Scraper Class
 import pandas as pd
 from datetime import datetime
 from selenium.webdriver.common.by import By
@@ -45,7 +44,6 @@ class TrendyolScraper(BaseScraper):
         ]
 
     def _expand_attributes(self, timeout: int = 10):
-        """'Daha Fazla Göster' butonuna tıklayarak tüm özellikleri açar."""
         wait = WebDriverWait(self.driver, timeout)
         root_selector = "div.product-attributes-container.product-attributes, div[data-drroot='product-attributes']"
 
@@ -73,7 +71,6 @@ class TrendyolScraper(BaseScraper):
                 ):
                     self.driver.execute_script("arguments[0].click();", btn)
 
-                # Genişlemenin tamamlanmasını bekle (basit heuristic)
                 try:
                     wait.until(
                         lambda d: len(
@@ -134,7 +131,11 @@ class TrendyolScraper(BaseScraper):
                 self.logger.error(f"Sayfa {page} hatası: {e}")
 
         df = pd.DataFrame(all_data)
+
+        # --- KRİTİK NOKTA: LİNKLERİ KAYDET ---
+        # Bu satır veriyi links şemasına yazar.
         self.save_data(df, "Links", sub_folder="links")
+
         return df
 
     def _extract_single_product(self, link: str) -> dict:
@@ -143,7 +144,6 @@ class TrendyolScraper(BaseScraper):
             self.driver.get(link)
             wait = WebDriverWait(self.driver, 15)
 
-            # Başlık ve Marka
             try:
                 h1 = wait.until(
                     EC.presence_of_element_located(
@@ -156,10 +156,8 @@ class TrendyolScraper(BaseScraper):
             except Exception:
                 pass
 
-            # Özellikleri Genişlet
             self._expand_attributes()
 
-            # Verileri Oku
             attr_items = self.driver.find_elements(
                 By.CSS_SELECTOR, "div.attributes div.attribute-item"
             )
@@ -199,5 +197,8 @@ class TrendyolScraper(BaseScraper):
             results.append(details)
 
         df = pd.DataFrame(results)
+
+        # Detayları kaydet -> raw şemasına
         self.save_data(df, "Details", sub_folder="raw")
+
         return df

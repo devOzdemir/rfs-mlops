@@ -1,4 +1,3 @@
-# Hepsiburada Scraper Class
 import pandas as pd
 from datetime import datetime
 from selenium.webdriver.common.by import By
@@ -6,7 +5,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException
 
-# Base Class import (Proje yapısına göre import yolu değişebilir)
+# Base Class import
 from src.rfs.data.base_scraper import BaseScraper
 
 
@@ -48,13 +47,11 @@ class HepsiburadaScraper(BaseScraper):
         )
 
     def _scroll_to_tech_specs(self, timeout: int = 20):
-        """Teknik özellikler tablosuna scroll etme ve lazy-load tetikleme mantığı."""
         self._wait_dom_interactive(timeout=min(10, timeout))
         wait = WebDriverWait(self.driver, timeout, poll_frequency=0.35)
 
         def _try_jump(d):
             try:
-                # Link veya buton ile atlamayı dene
                 candidates = d.find_elements(By.CSS_SELECTOR, "a[href='#techSpecs']")
                 candidates.extend(
                     d.find_elements(
@@ -80,7 +77,6 @@ class HepsiburadaScraper(BaseScraper):
                 return el
             except NoSuchElementException:
                 _try_jump(d)
-                # Kademeli scroll
                 d.execute_script("window.scrollBy(0, 350);")
                 return False
 
@@ -126,7 +122,11 @@ class HepsiburadaScraper(BaseScraper):
                 self.logger.error(f"Sayfa {page} yüklenirken hata: {e}")
 
         df = pd.DataFrame(all_results)
+
+        # --- KRİTİK NOKTA: LİNKLERİ KAYDET ---
+        # Bu satır veriyi links şemasına yazar.
         self.save_data(df, "Links", sub_folder="links")
+
         return df
 
     def _extract_single_product(self, link: str) -> dict:
@@ -136,7 +136,6 @@ class HepsiburadaScraper(BaseScraper):
             self._wait_dom_interactive()
             wait = WebDriverWait(self.driver, 15)
 
-            # Temel bilgiler
             try:
                 title = wait.until(
                     EC.presence_of_element_located(
@@ -153,7 +152,6 @@ class HepsiburadaScraper(BaseScraper):
             except Exception:
                 self.logger.warning(f"Başlık/Marka alınamadı: {link}")
 
-            # Teknik Özellikler
             tech_specs = self._scroll_to_tech_specs()
             if tech_specs:
                 rows = tech_specs.find_elements(By.CLASS_NAME, "jkj4C4LML4qv2Iq8GkL3")
@@ -163,8 +161,6 @@ class HepsiburadaScraper(BaseScraper):
                             By.CLASS_NAME, "OXP5AzPvafgN_i3y6wGp"
                         ).text.strip()
                         val_el = row.find_element(By.CLASS_NAME, "AxM3TmSghcDRH1F871Vh")
-
-                        # Link içindeki değeri veya direkt text'i al
                         links = val_el.find_elements(By.TAG_NAME, "a")
                         value = (
                             links[0].get_attribute("title").strip()
@@ -173,7 +169,6 @@ class HepsiburadaScraper(BaseScraper):
                         )
 
                         if label in features:
-                            # Varsa birleştir (append), yoksa ata
                             if features[label] and features[label] != value:
                                 features[label] = f"{features[label]}; {value}"
                             else:
@@ -203,5 +198,8 @@ class HepsiburadaScraper(BaseScraper):
             results.append(details)
 
         df = pd.DataFrame(results)
+
+        # Detayları kaydet -> raw şemasına
         self.save_data(df, "Details", sub_folder="raw")
+
         return df
