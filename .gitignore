@@ -11,6 +11,8 @@ venv/
 
 # Data artifacts (Git'e atilmaz)
 data/raw/*
+data/links/*
+data/logs/*
 data/processed/*
 !data/raw/.gitkeep
 !data/processed/.gitkeep
@@ -23,3 +25,4 @@ mlruns/
 
 # Environment variables
 .env
+.venv/
