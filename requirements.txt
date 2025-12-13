@@ -1,0 +1,13 @@
+pandas
+numpy
+scikit-learn
+sqlalchemy
+psycopg2-binary
+mlflow
+apache-airflow
+selenium
+beautifulsoup4
+fastapi
+uvicorn
+streamlit
+pyyaml
