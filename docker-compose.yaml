@@ -53,27 +53,28 @@ services:
       exit 0;
       "
 
-  # 3. DENEY TAKİBİ (MLflow Sunucusu)
-  # ... (postgres, minio, create_buckets AYNI KALIYOR) ...
-
-  # 3. DENEY TAKİBİ (MLflow Sunucusu)
+# 3. DENEY TAKİBİ (MLflow Sunucusu)
   mlflow:
-    # ARTIK IMAGE YOK, BUILD VAR:
     build: 
       context: ./docker/mlflow
     container_name: rfs_mlflow
     restart: always
     ports:
-      - "5001:5000"  # Portu 5001 yaptık (AirPlay çakışmasını önlemek için)
+      - "5001:5000"
     environment:
-      # Postgres Bağlantısı (+psycopg2 ekli)
-      BACKEND_STORE_URI: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-      # MinIO (S3) Bağlantısı
+      # DİKKAT: Artık mlflow_user ve mlflow_db kullanıyor!
+      BACKEND_STORE_URI: postgresql+psycopg2://${MLFLOW_DB_USER}:${MLFLOW_DB_PASSWORD}@postgres:5432/${MLFLOW_DB_NAME}
+      
+      # MinIO Ayarları (Aynı kalıyor)
       MLFLOW_S3_ENDPOINT_URL: http://minio:9000
       AWS_ACCESS_KEY_ID: ${MINIO_ACCESS_KEY}
       AWS_SECRET_ACCESS_KEY: ${MINIO_SECRET_KEY}
       DEFAULT_ARTIFACT_ROOT: s3://mlflow-bucket/
-    command: mlflow server --backend-store-uri postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB} --default-artifact-root s3://mlflow-bucket/ --host 0.0.0.0
+    command: >
+      mlflow server 
+      --backend-store-uri postgresql+psycopg2://${MLFLOW_DB_USER}:${MLFLOW_DB_PASSWORD}@postgres:5432/${MLFLOW_DB_NAME} 
+      --default-artifact-root s3://mlflow-bucket/ 
+      --host 0.0.0.0
     depends_on:
       postgres:
         condition: service_healthy
