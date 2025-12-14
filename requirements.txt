@@ -1,12 +1,29 @@
+# --- Temel Veri İşleme ---
 pandas
 numpy
-scikit-learn
+
+# --- Veritabanı ---
 sqlalchemy
 psycopg2-binary
+python-dotenv
+
+# --- Makine Öğrenmesi Modelleri ---
+scikit-learn
+xgboost
+lightgbm
+
+# --- Hiperparametre Optimizasyonu ---
+optuna
+
+# --- MLOps ve Takip ---
 mlflow
-apache-airflow
+boto3  
+
+# --- Scraping ---
 selenium
 beautifulsoup4
+
+# --- API ve Arayüz ---
 fastapi
 uvicorn
 streamlit

@@ -1,0 +1,99 @@
+experiment_name: "RFS_Laptop_Price_Prediction_Production"
+
+# --- YENİ: Veri Konfigürasyonu ---
+data_config:
+  target_col: "price_try"  # Hedef değişken (Bunu drop listesine yazma!)
+  
+  drop_cols:
+    # --- A. Metadata & Teknik (Genelde hep atılır) ---
+    - "url"
+    - "scraped_at"
+    - "processed_at"
+    - "created_at"
+    - "title"          # NLP yapılmadığı sürece metin verisi atılır
+
+    # --- B. Kategorik & Fiziksel Özellikler ---
+    # (Kullanmak istediklerinin başına '#' koy!)
+    # - "brand"        <-- Başında # var, yani bu özellik modele GİRER.
+    # - "platform"     <-- Hepsiburada/Trendyol farkı (Önemli olabilir)
+    - "intended_use"   # Kullanım amacı (Ofis/Oyun)
+    - "color"          # Renk fiyata az etki eder, kapalı kalsın
+    - "weight"         # Ağırlık
+    #- "panel_type"     # IPS/TN/OLED
+    #- "display_standard" # FHD/4K
+    
+    # --- C. Donanım Özellikleri (Fiyatı en çok bunlar belirler) ---
+    # Bu yüzden varsayılan olarak açık bıraktım (Yorum satırı yaptım)
+    # - "operating_system"
+    # - "cpu_family"       # i5, i7, Ryzen 5...
+    - "cpu_model"        # 13500H, 5600U...
+    # - "cpu_generation"   # 13. Nesil (Bazen modelden çıkarılabilir)
+    # - "cpu_cores"
+    # - "cpu_max_ghz"
+    # - "ram_gb"           # Kritik
+    #- "ram_type"         # DDR4/DDR5
+    # - "ssd_gb"           # Kritik
+    - "hdd_gb"           # Artık çoğu laptopta yok, gürültü yapabilir
+    # - "gpu_model"        # RTX 4060... (Çok Kritik)
+    - "gpu_type"         # Harici/Dahili
+    # - "gpu_vram_gb"      # Ekran kartı hafızası
+    - "gpu_vram_type"    # GDDR6
+    # - "screen_size_inch"
+    # - "resolution"       # 1920x1080
+    #- "ppi"              # Piksel yoğunluğu (Hesaplanmış veri)
+    #- "refresh_rate_hz"  # 144Hz, 60Hz
+
+# --- Eğitilecek Modeller ---  
+benchmark_models:
+  - "LinearRegression"
+  - "Ridge"
+  - "Lasso"
+  - "RandomForest"
+  - "ExtraTrees"
+  - "XGBoost"
+  - "LightGBM"
+  - "GradientBoosting"
+
+# 2. Optuna Arama Uzayı
+optuna:
+  n_trials: 20
+  metric: "rmse"
+  direction: "minimize"
+
+  Ridge:
+    alpha: {low: 0.01, high: 100.0}
+  
+  Lasso:
+    alpha: {low: 0.0001, high: 10.0}
+
+  RandomForest:
+    n_estimators: {low: 50, high: 500}
+    max_depth: {low: 5, high: 30}
+    min_samples_split: {low: 2, high: 15}
+    min_samples_leaf: {low: 1, high: 10}  
+
+  ExtraTrees:
+    n_estimators: {low: 50, high: 500}
+    max_depth: {low: 5, high: 30}
+    min_samples_split: {low: 2, high: 15}  
+
+  XGBoost:
+    n_estimators: {low: 100, high: 1500}
+    max_depth: {low: 3, high: 12}
+    learning_rate: {low: 0.01, high: 0.3}
+    subsample: {low: 0.5, high: 1.0}
+    colsample_bytree: {low: 0.5, high: 1.0}
+
+  LightGBM:
+    n_estimators: {low: 100, high: 1500}
+    num_leaves: {low: 20, high: 150}
+    learning_rate: {low: 0.01, high: 0.3}
+    feature_fraction: {low: 0.5, high: 1.0}
+
+  GradientBoosting:
+    n_estimators: {low: 100, high: 600}
+    learning_rate: {low: 0.01, high: 0.3}
+    max_depth: {low: 3, high: 10}
+    subsample: {low: 0.5, high: 1.0}
+    min_samples_split: {low: 2, high: 20}
+

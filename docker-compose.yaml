@@ -1,9 +1,9 @@
-version: '3.8'
-
 services:
+  # 1. VERİTABANI (Metrikler ve Parametreler için)
   postgres:
     image: postgres:15
     container_name: rfs_postgres
+    restart: always
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -13,14 +13,73 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./docker/postgres/init_db.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  mlflow:
-    image: ghcr.io/mlflow/mlflow:v2.7.1
+  # 2. DOSYA DEPOLAMA (Artifacts - Modeller için) -> S3 Clon'u
+  minio:
+    image: minio/minio:latest
+    container_name: rfs_minio
+    restart: always
     ports:
-      - "5000:5000"
-    command: mlflow server --backend-store-uri postgresql://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-admin}@postgres:5432/rfs_db --default-artifact-root /mlflow/artifacts --host 0.0.0.0
+      - "9000:9000" # API Portu
+      - "9001:9001" # Arayüz Portu
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}      # .env dosyasından
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}  # .env dosyasından
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # 2.5. MINIO BUCKET OLUŞTURUCU (Otomatik kova oluşturur)
+  create_buckets:
+    image: minio/mc
     depends_on:
-      - postgres
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc alias set myminio http://minio:9000 ${MINIO_ACCESS_KEY} ${MINIO_SECRET_KEY};
+      /usr/bin/mc mb myminio/mlflow-bucket;
+      /usr/bin/mc policy set download myminio/mlflow-bucket;
+      exit 0;
+      "
+
+  # 3. DENEY TAKİBİ (MLflow Sunucusu)
+  # ... (postgres, minio, create_buckets AYNI KALIYOR) ...
+
+  # 3. DENEY TAKİBİ (MLflow Sunucusu)
+  mlflow:
+    # ARTIK IMAGE YOK, BUILD VAR:
+    build: 
+      context: ./docker/mlflow
+    container_name: rfs_mlflow
+    restart: always
+    ports:
+      - "5001:5000"  # Portu 5001 yaptık (AirPlay çakışmasını önlemek için)
+    environment:
+      # Postgres Bağlantısı (+psycopg2 ekli)
+      BACKEND_STORE_URI: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      # MinIO (S3) Bağlantısı
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+      AWS_ACCESS_KEY_ID: ${MINIO_ACCESS_KEY}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_SECRET_KEY}
+      DEFAULT_ARTIFACT_ROOT: s3://mlflow-bucket/
+    command: mlflow server --backend-store-uri postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB} --default-artifact-root s3://mlflow-bucket/ --host 0.0.0.0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
 
 volumes:
   postgres_data:
+  minio_data:

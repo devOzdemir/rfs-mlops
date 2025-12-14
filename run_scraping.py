@@ -7,11 +7,11 @@ def main():
     CONFIG = {
         "HB": {
             "url": "https://www.hepsiburada.com/laptop-notebook-dizustu-bilgisayarlar-c-98?puan=3-max&sayfa=",
-            "pages": 1,  # Test için düşük tutuldu
+            "pages": 10,  # Test için düşük tutuldu
         },
         "TY": {
             "url": "https://www.trendyol.com/sr?wc=103108%2C106084&sst=MOST_RATED",
-            "pages": 1,
+            "pages": 20,  # Test için düşük tutuldu
         },
     }
 
