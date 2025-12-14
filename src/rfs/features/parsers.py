@@ -1,28 +1,80 @@
 import re
-import numpy as np
 import pandas as pd
 from typing import Any, Optional
 
 
 # --- Yardımcı Fonksiyonlar ---
-def _clean_text(val: Any) -> Optional[str]:
+def clean_garbage_text(val: Any) -> Optional[str]:
+    """
+    Tüm string kolonlarda genel temizlik yapar.
+    'belirtilmemiş', 'yok', 'hdd yok' gibi ifadeleri NULL (None) yapar.
+    Bu fonksiyon Pipeline'ın en başında çağrılır.
+    """
     if pd.isna(val):
         return None
+
+    # String değilse dokunma (sayısal kolonları bozmayalım)
+    if not isinstance(val, str):
+        # Eğer zaten int/float geldiyse ve string'e çevrildiğinde 'nan' değilse döndür
+        return val
+
+    # Küçük harfe çevir ve boşlukları temizle
     s = str(val).strip().lower()
-    invalids = {"", "nan", "none", "null", "-", "yok", "belirtilmemiş", "belirtilmemis"}
-    return None if s in invalids else re.sub(r"\s+", " ", s)
+    s = re.sub(r"\s+", " ", s)  # Fazla boşlukları teke indir
+
+    # Çöp Kelimeler Listesi (Stop Words)
+    invalid_tokens = {
+        "",
+        "nan",
+        "none",
+        "null",
+        "-",
+        "yok",
+        "belirtilmemiş",
+        "belirtilmemis",
+        "hdd yok",
+        "ssd yok",
+        "işletim sistemi yok",
+        "bilinmiyor",
+        "tanımsız",
+        "tümü",
+    }
+
+    if s in invalid_tokens:
+        return None
+
+    return s
+
+
+def _clean_text(val: Any) -> Optional[str]:
+    """
+    Diğer parser fonksiyonlarının kullandığı dahili temizleyici.
+    clean_garbage_text'i kullanır.
+    """
+    return clean_garbage_text(val)
 
 
 # --- Numeric Parsers ---
 def parse_numeric(val: Any, min_val: float, max_val: float) -> Optional[float]:
+    """
+    String içindeki sayıyı çeker (örn: '16 GB' -> 16.0).
+    Min-Max aralığını kontrol eder.
+    """
     if pd.isna(val):
         return None
 
     if isinstance(val, (int, float)):
         return float(val) if min_val <= val <= max_val else None
 
-    # "16 GB" -> 16.0
-    s = str(val).strip().lower().replace(",", ".")
+    # Temizlik yap
+    s = _clean_text(val)
+    if not s:
+        return None
+
+    # "16 GB" -> 16.0 temizliği
+    s = s.replace(",", ".")
+
+    # Regex ile sayıyı yakala (ondalık dahil)
     m = re.search(r"(\d+(\.\d+)?)", s)
     if m:
         try:
@@ -33,24 +85,64 @@ def parse_numeric(val: Any, min_val: float, max_val: float) -> Optional[float]:
     return None
 
 
+def parse_gpu_vram(
+    val: Any, min_val: float = 0, max_val: float = 32
+) -> Optional[float]:
+    """
+    GPU VRAM için özel parser.
+    'Paylaşımlı', 'Entegre', 'Dahili' -> 0.0 GB olarak kabul edilir.
+    Diğer durumlarda içindeki sayı çekilir ve min-max kontrolü yapılır.
+    """
+    if pd.isna(val):
+        return None
+
+    s = _clean_text(val)
+    if not s:
+        return None
+
+    # Özel Durumlar: Paylaşımlı kartların belleği 0 kabul edilir
+    shared_keywords = [
+        "paylaşım",
+        "paylasim",
+        "dahili",
+        "entegre",
+        "integrated",
+        "onboard",
+        "intel",
+        "amd radeon graphics",
+        "uma",
+    ]
+
+    # Tam eşleşme veya içerik kontrolü
+    if any(keyword in s for keyword in shared_keywords):
+        return 0.0
+
+    # Diğer durumlar için standart sayısal ayrıştırma
+    return parse_numeric(val, min_val=min_val, max_val=max_val)
+
+
 def parse_price(val: Any) -> Optional[float]:
+    """
+    Fiyat temizliği yapar. 1.299,00 TL -> 1299.0
+    """
     if pd.isna(val):
         return None
     if isinstance(val, (int, float)):
         return float(val)
 
-    # 1.299,00 TL veya 1.299 TL temizliği
     s = str(val).lower().replace("tl", "").replace("₺", "").strip()
-    # Nokta binlik, virgül ondalık ise:
+
+    # Nokta binlik, virgül ondalık ise (TR Standardı):
     if "." in s and "," in s:
         s = s.replace(".", "").replace(",", ".")
-    elif "." in s and len(s.split(".")[-1]) == 3:  # 45.000 gibi
+    elif "." in s and len(s.split(".")[-1]) == 3:  # 45.000 gibi binlik ayırıcı
         s = s.replace(".", "")
     else:
         s = s.replace(",", ".")
 
     try:
         price = float(s)
+        # Mantıklı fiyat aralığı (örn: 1000 TL altı laptop olmaz)
         return price if 1000 <= price <= 1_000_000 else None
     except ValueError:
         return None
@@ -68,8 +160,9 @@ def parse_brand(val: Any) -> Optional[str]:
         "ilife": "i-life",
         "i-life digital": "i-life",
         "game garaj": "game garaj",
+        "huawei": "huawei",
     }
-    return mapping.get(s, s)  # Mapping yoksa kendisini döndür
+    return mapping.get(s, s)
 
 
 def parse_os(val: Any) -> Optional[str]:
@@ -82,7 +175,7 @@ def parse_os(val: Any) -> Optional[str]:
     if "mac" in s or "macos" in s:
         return "macos"
     if "android" in s:
-        return "linux"  # Android laptopları linux sayabiliriz
+        return "linux"
     if "ubuntu" in s or "linux" in s:
         return "linux"
     if "windows" in s:

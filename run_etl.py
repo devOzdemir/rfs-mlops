@@ -8,7 +8,7 @@ from src.rfs.features.pipeline import LaptopETLPipeline
 
 
 def main():
-    print("🚀 ETL Pipeline Başlatılıyor...")
+    print("ETL Pipeline Başlatılıyor...")
     print("--------------------------------")
 
     try:
@@ -19,11 +19,11 @@ def main():
         pipeline.run()
 
         print("--------------------------------")
-        print("✅ ETL İşlemi Başarıyla Tamamlandı!")
-        print("👉 Şimdi 'transform.laptops' tablosunu sorgulayabilirsin.")
+        print("ETL İşlemi Başarıyla Tamamlandı!")
+        print("Şimdi 'transform.laptops' tablosunu sorgulayabilirsin.")
 
     except Exception as e:
-        print(f"\n❌ Kritik Hata Oluştu: {e}")
+        print(f"\n Kritik Hata Oluştu: {e}")
         # Detaylı hatayı görmek için raise edebiliriz
         raise
 

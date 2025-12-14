@@ -1,9 +1,11 @@
 import pandas as pd
 import logging
 from datetime import datetime
+from sqlalchemy import text
 
+# Proje İçi Modüller
 from src.rfs.db.connector import get_db_engine
-from src.rfs.features import extractors, parsers
+from src.rfs.features import extractors, parsers, engineering
 
 # ----------------------------------------------------------------
 # KONFİGÜRASYON VE SABİTLER
@@ -52,6 +54,7 @@ COLS_EN = {
 }
 
 # Veritabanında görmek istediğimiz ideal sütun sırası
+# (Transform ve Features tabloları için ortak temel)
 FINAL_COLUMN_ORDER = [
     # Temel Bilgiler
     "title",
@@ -78,7 +81,7 @@ FINAL_COLUMN_ORDER = [
     "gpu_type",
     "gpu_vram_gb",
     "gpu_vram_type",
-    # Ekran
+    # Ekran (PPI buraya feature engineering adımında eklenecek)
     "screen_size_inch",
     "resolution",
     "display_standard",
@@ -100,19 +103,40 @@ class LaptopETLPipeline:
     def __init__(self):
         self.engine = get_db_engine()
         self.logger = logging.getLogger("etl.pipeline")
-        # Log seviyesini ayarla (konsolda görmek için)
+        # Log seviyesini ayarla
         if not self.logger.handlers:
             logging.basicConfig(level=logging.INFO)
 
     def load_raw_data(self):
-        """Raw tablolarından (hb ve ty) veriyi çeker."""
+        """
+        Raw tablolarından SADECE en son eklenen (güncel) veriyi çeker.
+        Snapshot mantığı: DATE(created_at) == MAX(DATE(created_at))
+        """
         try:
-            # Pandas read_sql kullanarak şemaları belirtiyoruz
-            df_hb = pd.read_sql("SELECT * FROM raw.hb", self.engine)
-            df_ty = pd.read_sql("SELECT * FROM raw.ty", self.engine)
+            # Hepsiburada için sorgu
+            query_hb = """
+            SELECT * FROM raw.hb 
+            WHERE DATE(created_at) = (SELECT DATE(MAX(created_at)) FROM raw.hb)
+            """
 
-            self.logger.info(f"Loaded raw data. HB: {len(df_hb)}, TY: {len(df_ty)}")
+            # Trendyol için sorgu
+            query_ty = """
+            SELECT * FROM raw.ty 
+            WHERE DATE(created_at) = (SELECT DATE(MAX(created_at)) FROM raw.ty)
+            """
+
+            df_hb = pd.read_sql(query_hb, self.engine)
+            df_ty = pd.read_sql(query_ty, self.engine)
+
+            self.logger.info(
+                f"Loaded LATEST raw data only. HB: {len(df_hb)}, TY: {len(df_ty)}"
+            )
+
+            if df_hb.empty and df_ty.empty:
+                self.logger.warning("Dikkat: Son işlem tarihinde hiç veri bulunamadı!")
+
             return df_hb, df_ty
+
         except Exception as e:
             self.logger.error(f"Error loading data: {e}")
             raise
@@ -135,10 +159,16 @@ class LaptopETLPipeline:
         return df_merged
 
     def clean_and_transform(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Veri temizleme, dönüştürme ve zenginleştirme."""
+        """Veri temizleme, dönüştürme ve zenginleştirme (Silver Layer)."""
 
-        # 1. Başlıktan Veri Doldurma (Imputation)
-        # ---------------------------------------
+        # --- GENEL TEMİZLİK ---
+        # Tüm object (string) tipli kolonlarda 'yok', 'belirtilmemiş' gibi ifadeleri temizle
+        object_cols = df.select_dtypes(include=["object", "string"]).columns
+        for col in object_cols:
+            df[col] = df[col].apply(parsers.clean_garbage_text)
+
+        # 1. Başlıktan Veri Doldurma (Imputation - Deterministic)
+        # -------------------------------------------------------
         df = extractors.fill_missing_from_title(
             df, "Başlık", "Ram (Sistem Belleği)", extractors.extract_ram_from_title
         )
@@ -151,12 +181,18 @@ class LaptopETLPipeline:
             "Ekran Yenileme Hızı",
             extractors.extract_refresh_rate_from_title,
         )
+        df = extractors.fill_missing_from_title(
+            df,
+            "Başlık",
+            "Çözünürlük Standartı",
+            extractors.extract_resolution_from_title,
+        )
 
         # 2. Kolon İsimlendirme (TR -> EN)
         # --------------------------------
         df = df.rename(columns=COLS_EN)
 
-        # 3. Apple Filtreleme (Veri setini kirletmemesi için)
+        # 3. Apple Filtreleme
         # -------------------
         mask_apple = df["brand"].astype(str).str.contains(
             "apple", case=False, na=False
@@ -164,81 +200,116 @@ class LaptopETLPipeline:
         df = df[~mask_apple].copy()
 
         # 4. Duplicate Temizliği (Title + Price bazlı)
-        # ----------------------
+        # --------------------------------------------
         df = df.drop_duplicates(subset=["title", "price_try"], keep="last")
 
         # 5. Column Parsing (Standartlaştırma)
         # ------------------------------------
         # Numeric Fields
         df["price_try"] = df["price_try"].apply(parsers.parse_price)
+        df["cpu_generation"] = df["cpu_generation"].apply(
+            lambda x: parsers.parse_numeric(x, 1, 15)
+        )
+        df["cpu_cores"] = df["cpu_cores"].apply(
+            lambda x: parsers.parse_numeric(x, 1, 15)
+        )
+        df["cpu_max_ghz"] = df["cpu_max_ghz"].apply(
+            lambda x: parsers.parse_numeric(x, 1, 6)
+        )
         df["ram_gb"] = df["ram_gb"].apply(lambda x: parsers.parse_numeric(x, 4, 128))
         df["ssd_gb"] = df["ssd_gb"].apply(lambda x: parsers.parse_numeric(x, 120, 8192))
+        df["hdd_gb"] = df["hdd_gb"].apply(lambda x: parsers.parse_numeric(x, 120, 8192))
+        df["gpu_vram_gb"] = df["gpu_vram_gb"].apply(
+            lambda x: parsers.parse_gpu_vram(x, 0, 32)
+        )
         df["screen_size_inch"] = df["screen_size_inch"].apply(
             lambda x: parsers.parse_numeric(x, 10, 20)
         )
-        df["cpu_generation"] = df["cpu_generation"].apply(
-            lambda x: parsers.parse_numeric(x, 1, 15)
+        df["refresh_rate_hz"] = df["refresh_rate_hz"].apply(
+            lambda x: parsers.parse_numeric(x, 30, 360)
         )
 
         # Categorical Fields
         df["brand"] = df["brand"].apply(parsers.parse_brand)
         df["operating_system"] = df["operating_system"].apply(parsers.parse_os)
-        df["gpu_type"] = df["gpu_type"].apply(parsers.parse_gpu_type)
-        df["panel_type"] = df["panel_type"].apply(parsers.parse_panel_type)
         df["cpu_family"] = df["cpu_family"].apply(parsers.parse_cpu_family)
+        # gpu model ?
+        df["gpu_type"] = df["gpu_type"].apply(parsers.parse_gpu_type)
+        # gpu vram type ?
         df["resolution"] = df["resolution"].apply(parsers.parse_resolution)
+        # display standard ?
+        df["panel_type"] = df["panel_type"].apply(parsers.parse_panel_type)
 
-        # 6. Null Fiyatları Temizle (Model için kritik)
+        # 6. Null Fiyatları Temizle
         df = df.dropna(subset=["price_try"])
-
-        # 7. Sütun Sıralamasını Düzenle (Reordering)
-        # -------------------------------------------
-        # Sadece veri setinde gerçekten var olan kolonları seç (Hata almamak için)
-        final_cols = [c for c in FINAL_COLUMN_ORDER if c in df.columns]
-
-        # Varsa listede unuttuğumuz ama df'de olan diğer kolonları da sona ekle
-        remaining_cols = [c for c in df.columns if c not in final_cols]
-
-        df = df[final_cols + remaining_cols]
 
         return df
 
-    def save_transformed_data(self, df: pd.DataFrame):
-        """İşlenmiş veriyi transform şemasına yazar."""
+    def feature_engineering_step(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Feature Engineering (Gold Layer). PPI ve Gruplama."""
+        self.logger.info("Applying Feature Engineering (PPI, Grouping)...")
+
+        # engineering.py modülünü kullan
+        df_engineered = engineering.apply_feature_engineering(df)
+        return df_engineered
+
+    def save_to_db(self, df: pd.DataFrame, schema: str, table: str):
+        """Genel veritabanı kayıt fonksiyonu. Sütun sırasını düzenler ve kaydeder."""
         try:
-            # İşlenme tarihini ekle
+            # Şemanın varlığından emin ol
+            with self.engine.connect() as conn:
+                conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {schema}"))
+                conn.commit()
+
             df["processed_at"] = datetime.now()
 
-            # DB'ye yaz (replace: her seferinde tabloyu sıfırla ve yeniden oluştur)
-            # Bu sayede sütun sırası da veritabanında düzelir.
+            # --- Sütun Sıralaması (Reordering) ---
+            # PPI gibi yeni eklenen kolonları da kapsayacak şekilde dinamik liste oluştur
+            target_order = FINAL_COLUMN_ORDER.copy()
+
+            # Eğer 'ppi' hesaplandıysa ve df'de varsa, 'screen_size_inch' yanına ekleyelim
+            if "ppi" in df.columns and "ppi" not in target_order:
+                idx = target_order.index("screen_size_inch")
+                target_order.insert(idx + 1, "ppi")
+
+            # Sadece df'de gerçekten var olan kolonları seç (Hata önleyici)
+            cols_to_write = [c for c in target_order if c in df.columns]
+
+            # Listede olmayan ama df'de kalan kolonlar varsa (varsa sona ekle)
+            remaining = [c for c in df.columns if c not in cols_to_write]
+
+            df = df[cols_to_write + remaining]
+
+            # DB'ye Yaz (Replace mantığı ile)
             df.to_sql(
-                name="laptops",
+                name=table,
                 con=self.engine,
-                schema="transform",
-                if_exists="replace",
+                schema=schema,
+                if_exists="replace",  # Tabloyu sil ve yeniden oluştur (Snapshot)
                 index=False,
             )
-            self.logger.info(
-                f"Saved transformed data: {len(df)} rows to transform.laptops"
-            )
+            self.logger.info(f"Saved to {schema}.{table}: {len(df)} rows")
+
         except Exception as e:
-            self.logger.error(f"Error saving data: {e}")
+            self.logger.error(f"Error saving to {schema}.{table}: {e}")
             raise
 
     def run(self):
-        """Pipeline'ı çalıştırır."""
+        """Pipeline Akışı: Extract -> Transform -> Feature Eng -> Load"""
         self.logger.info("Starting ETL Pipeline...")
 
-        # Extract
+        # 1. Extract (En Güncel Veri)
         df_hb, df_ty = self.load_raw_data()
 
-        # Merge
+        # 2. Merge
         df_merged = self.merge_datasets(df_hb, df_ty)
 
-        # Transform (Cleaning + Reordering)
+        # 3. Transform (Silver Layer - Temiz Veri)
         df_clean = self.clean_and_transform(df_merged)
+        self.save_to_db(df_clean, "transform", "laptops")
 
-        # Load
-        self.save_transformed_data(df_clean)
+        # 4. Feature Engineering (Gold Layer - Model Verisi)
+        df_final = self.feature_engineering_step(df_clean)
+        self.save_to_db(df_final, "features", "laptops_final")
 
         self.logger.info("ETL Pipeline completed successfully.")
