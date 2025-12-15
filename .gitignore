@@ -32,3 +32,6 @@ logs/*
 !logs/.gitkeep
 !dags/.gitkeep
 !plugins/.gitkeep
+
+# macOS
+.DS_Store

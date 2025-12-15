@@ -1,6 +1,8 @@
 # --- Temel Veri İşleme ---
 pandas
 numpy
+ipykernel
+seaborn
 
 # --- Veritabanı ---
 sqlalchemy

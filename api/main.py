@@ -105,7 +105,7 @@ def predict_price(input_data: LaptopInput):
     try:
         prediction = model_pipeline.predict(df)
 
-        # CEVAP JSON'INI GÜNCELLİYORUZ
+        # CEVAP JSON'INI GÜNCELLE
         return {
             "predicted_price_try": round(float(prediction[0]), 2),
             "currency": "TRY",
