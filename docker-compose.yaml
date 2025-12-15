@@ -1,9 +1,55 @@
+# ==========================================
+# 0. AĞ YAPILANDIRMASI 
+# ==========================================
+networks:
+  rfs_network:
+    driver: bridge
+
+# ==========================================
+# ORTAK AYARLAR (YAML Anchors)
+# ==========================================
+x-airflow-common:
+  &airflow-common
+  build:
+    context: ./docker/airflow
+  networks:
+    - rfs_network
+  environment:
+    &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    AIRFLOW_UID: 50000
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_DB_USER}:${AIRFLOW_DB_PASSWORD}@postgres/${AIRFLOW_DB_NAME}
+    AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_DB_USER}:${AIRFLOW_DB_PASSWORD}@postgres/${AIRFLOW_DB_NAME}
+    AIRFLOW__WEBSERVER__SECRET_KEY: 'secret_stable_key'
+    AIRFLOW__CORE__FERNET_KEY: ''
+    AIRFLOW__CORE__TEST_CONNECTION: 'Enabled'
+    DB_HOST: postgres
+    MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+    AWS_ACCESS_KEY_ID: ${MINIO_ACCESS_KEY}
+    AWS_SECRET_ACCESS_KEY: ${MINIO_SECRET_KEY}
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - ./logs:/opt/airflow/logs
+    - ./plugins:/opt/airflow/plugins
+    - ./src:/opt/airflow/src
+    - ./.env:/opt/airflow/.env
+    - ./configs:/opt/airflow/configs
+  depends_on:
+    postgres:
+      condition: service_healthy
+
 services:
-  # 1. VERİTABANI (Metrikler ve Parametreler için)
+  # ==========================================
+  # 1. VERİTABANI (Postgres)
+  # ==========================================
   postgres:
     image: postgres:15
     container_name: rfs_postgres
     restart: always
+    networks:
+      - rfs_network
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -19,17 +65,21 @@ services:
       timeout: 5s
       retries: 5
 
-  # 2. DOSYA DEPOLAMA (Artifacts - Modeller için) -> S3 Clon'u
+  # ==========================================
+  # 2. DOSYA DEPOLAMA (MinIO - S3)
+  # ==========================================
   minio:
     image: minio/minio:latest
     container_name: rfs_minio
     restart: always
+    networks:
+      - rfs_network
     ports:
-      - "9000:9000" # API Portu
-      - "9001:9001" # Arayüz Portu
+      - "9000:9000"
+      - "9001:9001"
     environment:
-      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}      # .env dosyasından
-      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}  # .env dosyasından
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
     command: server /data --console-address ":9001"
     volumes:
       - minio_data:/data
@@ -39,9 +89,10 @@ services:
       timeout: 20s
       retries: 3
 
-  # 2.5. MINIO BUCKET OLUŞTURUCU (Otomatik kova oluşturur)
   create_buckets:
     image: minio/mc
+    networks:
+      - rfs_network
     depends_on:
       minio:
         condition: service_healthy
@@ -52,33 +103,90 @@ services:
       /usr/bin/mc policy set download myminio/mlflow-bucket;
       exit 0;
       "
-
-# 3. DENEY TAKİBİ (MLflow Sunucusu)
+  # ==========================================
+  # 3. DENEY TAKİBİ (MLflow)
+  # ==========================================
   mlflow:
     build: 
       context: ./docker/mlflow
     container_name: rfs_mlflow
     restart: always
+    networks:
+      - rfs_network
     ports:
       - "5001:5000"
     environment:
-      # DİKKAT: Artık mlflow_user ve mlflow_db kullanıyor!
       BACKEND_STORE_URI: postgresql+psycopg2://${MLFLOW_DB_USER}:${MLFLOW_DB_PASSWORD}@postgres:5432/${MLFLOW_DB_NAME}
-      
-      # MinIO Ayarları (Aynı kalıyor)
       MLFLOW_S3_ENDPOINT_URL: http://minio:9000
       AWS_ACCESS_KEY_ID: ${MINIO_ACCESS_KEY}
       AWS_SECRET_ACCESS_KEY: ${MINIO_SECRET_KEY}
       DEFAULT_ARTIFACT_ROOT: s3://mlflow-bucket/
-    command: >
-      mlflow server 
-      --backend-store-uri postgresql+psycopg2://${MLFLOW_DB_USER}:${MLFLOW_DB_PASSWORD}@postgres:5432/${MLFLOW_DB_NAME} 
-      --default-artifact-root s3://mlflow-bucket/ 
-      --host 0.0.0.0
+      MLFLOW_HOST: "0.0.0.0"
+    command: 
+      - mlflow
+      - server
+      - --backend-store-uri
+      - postgresql+psycopg2://${MLFLOW_DB_USER}:${MLFLOW_DB_PASSWORD}@postgres:5432/${MLFLOW_DB_NAME}
+      - --default-artifact-root
+      - s3://mlflow-bucket/
+      - --host
+      - 0.0.0.0
+      - --port
+      - "5000"
+      - --serve-artifacts
+      - --allowed-hosts
+      - "*"
     depends_on:
       postgres:
         condition: service_healthy
       minio:
+        condition: service_healthy
+  # ==========================================
+  # 4. İŞ AKIŞI YÖNETİMİ (Airflow)
+  # ==========================================
+  
+  airflow-init:
+    <<: *airflow-common
+    container_name: rfs_airflow_init
+    entrypoint: /bin/bash
+    command: >
+      -c "
+      airflow db migrate &&
+      airflow users create --username airflow --password airflow --firstname Admin --lastname User --role Admin --email admin@example.com;
+      airflow connections delete my_local_mac || true;
+      airflow connections add my_local_mac --conn-type ssh --conn-host host.docker.internal --conn-login ${MAC_SSH_USER} --conn-password ${MAC_SSH_PASSWORD} --conn-extra '{\"no_host_key_check\": true}'
+      "
+    environment:
+      <<: *airflow-common-env
+      _AIRFLOW_DB_MIGRATE: 'true'
+      MAC_SSH_USER: ${MAC_SSH_USER}
+      MAC_SSH_PASSWORD: ${MAC_SSH_PASSWORD}
+
+  airflow-webserver:
+    <<: *airflow-common
+    container_name: rfs_airflow_webserver
+    command: webserver
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 30s
+      retries: 5
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: rfs_airflow_scheduler
+    command: scheduler
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+      postgres:
         condition: service_healthy
 
 volumes:

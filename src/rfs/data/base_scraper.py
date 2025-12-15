@@ -108,10 +108,6 @@ class BaseScraper(ABC):
                 if "created_at" not in df.columns:
                     df["created_at"] = datetime.now()
 
-                # --- Link Kontrolü (Deduplication) ---
-                # Linkler tablosunda aynı linkten varsa tekrar eklememek için basit bir önlem (Opsiyonel ama önerilir)
-                # Şimdilik sadece append yapıyoruz, ileride buraya "upsert" mantığı eklenebilir.
-
                 # DB'ye Yaz
                 df.to_sql(
                     name=target_table,
@@ -133,7 +129,6 @@ class BaseScraper(ABC):
         else:
             self.logger.error("DB Engine yok, kayıt yapılamadı!")
 
-    # ... (Abstract metodlar aynı kalıyor) ...
     @abstractmethod
     def scrape_links(self, base_url: str, total_pages: int) -> pd.DataFrame:
         pass

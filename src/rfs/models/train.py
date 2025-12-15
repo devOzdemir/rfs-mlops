@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import os
 import mlflow
 import mlflow.sklearn
 import optuna
@@ -9,7 +10,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 # Modeller
-from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet
+from sklearn.linear_model import LinearRegression, Ridge, Lasso
 from sklearn.ensemble import (
     RandomForestRegressor,
     GradientBoostingRegressor,
@@ -23,20 +24,27 @@ from src.rfs.models.data_loader import load_training_data
 from src.rfs.models.preprocessing import create_preprocessor
 from src.rfs.utils.config_loader import load_config, setup_env_and_logging
 
-# Ayarları Yükle
+# --- GLOBAL LOGGING AYARLARI (Zararsız olduğu için kalabilir) ---
 setup_env_and_logging()
 logger = logging.getLogger("rfs_trainer")
-CONFIG = load_config("configs/model_config.yaml")
 
-MLFLOW_TRACKING_URI = "http://localhost:5001"
-mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
-mlflow.set_experiment(CONFIG["experiment_name"])
+# DİKKAT: CONFIG ve MLFLOW bağlantı satırlarını buradan kaldırdık.
+# Artık hepsi __init__ içinde yönetilecek.
 
 
 class IndustrialTrainer:
     def __init__(self):
-        # --- YENİ: Config'den Veri Ayarlarını Çek ---
-        self.data_config = CONFIG["data_config"]
+        # 1. Config Dosyasını Yükle (DAG Parse hatasını önlemek için burada)
+        self.config = load_config("configs/model_config.yaml")
+
+        # 2. MLflow Bağlantısını Kur
+        # Airflow içindeysek env variable gelir, yoksa localhost fallback olur
+        tracking_uri = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5001")
+        mlflow.set_tracking_uri(tracking_uri)
+        mlflow.set_experiment(self.config["experiment_name"])
+
+        # 3. Veri Ayarlarını Çek
+        self.data_config = self.config["data_config"]
         self.target_col = self.data_config["target_col"]
         self.drop_cols = self.data_config["drop_cols"]
 
@@ -47,14 +55,12 @@ class IndustrialTrainer:
         df = load_training_data()
 
         # Hedef kolonu ve drop edilecekleri ayır
-        # X oluştururken hem target'ı hem de drop_cols listesindekileri atıyoruz
         cols_to_drop = self.drop_cols + [self.target_col]
 
-        # errors='ignore' sayesinde listede olup veride olmayanlar (örn: id) hata vermez
+        # errors='ignore' sayesinde listede olup veride olmayanlar hata vermez
         X = df.drop(columns=cols_to_drop, errors="ignore")
         y = df[self.target_col]
 
-        # Loglama: Ne yaptığımızı görelim
         logger.info(f"Target Column: {self.target_col}")
         logger.info(f"Dropped Columns (Configured): {self.drop_cols}")
 
@@ -103,7 +109,8 @@ class IndustrialTrainer:
             "GradientBoosting": GradientBoostingRegressor(random_state=42),
         }
 
-        models_to_run = CONFIG["benchmark_models"]
+        # Global CONFIG yerine self.config kullanıyoruz
+        models_to_run = self.config["benchmark_models"]
         best_model_name = None
         best_rmse = float("inf")
 
@@ -117,7 +124,6 @@ class IndustrialTrainer:
                 continue
 
             with mlflow.start_run(run_name=f"Benchmark_{model_name}"):
-                # --- YENİ: Veri Konfigürasyonunu MLflow'a Kaydet ---
                 mlflow.log_param("target_col", self.target_col)
                 mlflow.log_param("dropped_cols", str(self.drop_cols))
 
@@ -156,14 +162,16 @@ class IndustrialTrainer:
         """Seçilen şampiyon modeli dinamik olarak optimize eder."""
         logger.info(f"🚀 Starting Optimization for Champion: {model_name}")
 
-        if model_name not in CONFIG["optuna"]:
+        # Global CONFIG yerine self.config kullanıyoruz
+        if model_name not in self.config["optuna"]:
             logger.warning(
                 f"{model_name} için YAML'da optimizasyon parametresi yok. İşlem atlanıyor."
             )
             return
 
         def objective(trial):
-            model_params = CONFIG["optuna"][model_name]
+            # Global CONFIG yerine self.config kullanıyoruz
+            model_params = self.config["optuna"][model_name]
 
             if model_name == "XGBoost":
                 params = {
@@ -316,7 +324,8 @@ class IndustrialTrainer:
             return np.sqrt(-scores.mean())
 
         study = optuna.create_study(direction="minimize")
-        study.optimize(objective, n_trials=CONFIG["optuna"]["n_trials"])
+        # Global CONFIG yerine self.config kullanıyoruz
+        study.optimize(objective, n_trials=self.config["optuna"]["n_trials"])
 
         logger.info(f"Best Params for {model_name}: {study.best_params}")
         self._train_and_log_best_model(model_name, study.best_params)
@@ -327,7 +336,6 @@ class IndustrialTrainer:
         )
 
         with mlflow.start_run(run_name=f"Champion_{model_name}_Optimized"):
-            # --- YENİ: Veri Konfigürasyonunu Final Modelde De Kaydet ---
             mlflow.log_param("target_col", self.target_col)
             mlflow.log_param("dropped_cols", str(self.drop_cols))
 

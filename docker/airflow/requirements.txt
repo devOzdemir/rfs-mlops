@@ -2,3 +2,15 @@ selenium
 pandas
 scikit-learn
 psycopg2-binary
+numpy
+sqlalchemy
+beautifulsoup4
+requests
+python-dotenv
+mlflow
+apache-airflow-providers-ssh
+xgboost
+lightgbm
+optuna
+python-dotenv  
+boto3          

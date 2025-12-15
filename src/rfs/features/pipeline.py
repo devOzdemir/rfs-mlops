@@ -259,7 +259,7 @@ class LaptopETLPipeline:
             # Şemanın varlığından emin ol
             with self.engine.connect() as conn:
                 conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {schema}"))
-                conn.commit()
+                # conn.commit()
 
             df["processed_at"] = datetime.now()
 

@@ -1,45 +1,44 @@
 experiment_name: "RFS_Laptop_Price_Prediction_Production"
 
-# --- YENİ: Veri Konfigürasyonu ---
+# --- Veri Konfigürasyonu ---
 data_config:
-  target_col: "price_try"  # Hedef değişken (Bunu drop listesine yazma!)
-  
+  target_col: "price_try"  # Hedef değişken
+      
+    # (Model eğitimi sırasında kullanmak istediklerinin başına '#' koy!)
   drop_cols:
     # --- A. Metadata & Teknik (Genelde hep atılır) ---
     - "url"
     - "scraped_at"
     - "processed_at"
     - "created_at"
-    - "title"          # NLP yapılmadığı sürece metin verisi atılır
+    - "title"          
 
     # --- B. Kategorik & Fiziksel Özellikler ---
-    # (Kullanmak istediklerinin başına '#' koy!)
-    # - "brand"        <-- Başında # var, yani bu özellik modele GİRER.
-    # - "platform"     <-- Hepsiburada/Trendyol farkı (Önemli olabilir)
+    #- "brand"        <-- Başında # var, yani bu özellik modele GİRER.
+    #- "platform"     <-- Hepsiburada/Trendyol farkı (Önemli olabilir)
     - "intended_use"   # Kullanım amacı (Ofis/Oyun)
     - "color"          # Renk fiyata az etki eder, kapalı kalsın
     - "weight"         # Ağırlık
     #- "panel_type"     # IPS/TN/OLED
     #- "display_standard" # FHD/4K
     
-    # --- C. Donanım Özellikleri (Fiyatı en çok bunlar belirler) ---
-    # Bu yüzden varsayılan olarak açık bıraktım (Yorum satırı yaptım)
-    # - "operating_system"
-    # - "cpu_family"       # i5, i7, Ryzen 5...
+    # --- C. Donanım Özellikleri ---
+    #- "operating_system"
+    #- "cpu_family"       # i5, i7, Ryzen 5...
     - "cpu_model"        # 13500H, 5600U...
-    # - "cpu_generation"   # 13. Nesil (Bazen modelden çıkarılabilir)
-    # - "cpu_cores"
-    # - "cpu_max_ghz"
-    # - "ram_gb"           # Kritik
+    #- "cpu_generation"   # 13. Nesil (Bazen modelden çıkarılabilir)
+    #- "cpu_cores"
+    #- "cpu_max_ghz"
+    #- "ram_gb"           # Kritik
     #- "ram_type"         # DDR4/DDR5
-    # - "ssd_gb"           # Kritik
+    #- "ssd_gb"           # Kritik
     - "hdd_gb"           # Artık çoğu laptopta yok, gürültü yapabilir
-    # - "gpu_model"        # RTX 4060... (Çok Kritik)
+    #- "gpu_model"        # RTX 4060... (Çok Kritik)
     - "gpu_type"         # Harici/Dahili
-    # - "gpu_vram_gb"      # Ekran kartı hafızası
+    #- "gpu_vram_gb"      # Ekran kartı hafızası
     - "gpu_vram_type"    # GDDR6
-    # - "screen_size_inch"
-    # - "resolution"       # 1920x1080
+    #- "screen_size_inch"
+    #- "resolution"       # 1920x1080
     #- "ppi"              # Piksel yoğunluğu (Hesaplanmış veri)
     #- "refresh_rate_hz"  # 144Hz, 60Hz
 
@@ -52,7 +51,7 @@ benchmark_models:
   - "ExtraTrees"
   - "XGBoost"
   - "LightGBM"
-  - "GradientBoosting"
+  #- "GradientBoosting"
 
 # 2. Optuna Arama Uzayı
 optuna:

@@ -18,9 +18,7 @@ class DatabaseConnector:
         return cls._instance
 
     def _initialize(self):
-        # GÜNCELLEME: Değişken isimlerini yeni .env dosyana göre ayarladık.
-        # Artık admin (POSTGRES_...) değil, uygulama kullanıcısı (RFS_...) bilgilerini çekiyoruz.
-
+        # Uygulama kullanıcısı (RFS_...) bilgilerini çekiyoruz.
         self.user = os.getenv("RFS_DB_USER")
         self.password = os.getenv("RFS_DB_PASSWORD")
         self.dbname = os.getenv("RFS_DB_NAME")
@@ -30,7 +28,7 @@ class DatabaseConnector:
         self.host = os.getenv("DB_HOST", "localhost")
         self.port = os.getenv("DB_PORT", "5432")
 
-        # Eksik bilgi kontrolü (Hata ayıklamayı kolaylaştırır)
+        # Eksik bilgi kontrolü
         if not all([self.user, self.password, self.dbname]):
             logging.error(
                 "❌ Veritabanı bilgileri .env dosyasından okunamadı! RFS_DB_... değişkenlerini kontrol et."
@@ -58,7 +56,7 @@ def get_db_engine():
     return DatabaseConnector().get_engine()
 
 
-# --- TEST KISMI (Dosyayı doğrudan çalıştırdığında bağlantıyı dener) ---
+# --- TEST KISMI ---
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     try:

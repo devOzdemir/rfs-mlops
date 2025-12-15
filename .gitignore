@@ -26,3 +26,9 @@ mlruns/
 # Environment variables
 .env
 .venv/
+
+# Airflow
+!logs/.gitkeep
+!dags/.gitkeep
+!plugins/.gitkeep
+logs/*

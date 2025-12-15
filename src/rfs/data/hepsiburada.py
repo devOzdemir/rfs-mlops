@@ -123,7 +123,6 @@ class HepsiburadaScraper(BaseScraper):
 
         df = pd.DataFrame(all_results)
 
-        # --- KRİTİK NOKTA: LİNKLERİ KAYDET ---
         # Bu satır veriyi links şemasına yazar.
         self.save_data(df, "Links", sub_folder="links")
 

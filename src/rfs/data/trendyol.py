@@ -132,7 +132,6 @@ class TrendyolScraper(BaseScraper):
 
         df = pd.DataFrame(all_data)
 
-        # --- KRİTİK NOKTA: LİNKLERİ KAYDET ---
         # Bu satır veriyi links şemasına yazar.
         self.save_data(df, "Links", sub_folder="links")
 
