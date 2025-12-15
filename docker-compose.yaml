@@ -213,6 +213,30 @@ services:
     depends_on:
       mlflow:
         condition: service_started
+
+
+# ==========================================
+# 6. KULLANICI ARAYÜZÜ (Flask UI)
+# ==========================================
+  ui:
+    build:
+      context: .                      # <-- DİKKAT: Ana dizini görüyor (böylece ui/ klasörünü alabilir)
+      dockerfile: ./docker/ui/Dockerfile # <-- DİKKAT: Dockerfile'ın yeni yeri
+    container_name: rfs_ui
+    restart: always
+    networks:
+      - rfs_network
+    ports:
+      - "5005:5000"
+    environment:
+      API_URL: http://rfs_api:8000/predict
+    depends_on:
+      api:
+        condition: service_started
+
+# ==========================================
+# 7. VERİ KALICILIĞI İÇİN VOLUMELAR
+# ==========================================        
 volumes:
   postgres_data:
   minio_data:

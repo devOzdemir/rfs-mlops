@@ -81,19 +81,23 @@ with DAG(
     default_args=default_args,
     description="Host(Scraping) -> Docker(ETL) -> Docker(Training)",
     schedule_interval=None,
-    start_date=datetime(2023, 1, 1),
+    start_date=datetime(2025, 1, 1),
     catchup=False,
     tags=["hybrid", "ssh", "scraper", "etl", "training"],
     params={
-        "hb_pages": Param(1, type="integer", description="HB Sayfa Sayısı"),
-        "ty_pages": Param(2, type="integer", description="TY Sayfa Sayısı"),
         "hb_url": Param(
             "https://www.hepsiburada.com/laptop-notebook-dizustu-bilgisayarlar-c-98?puan=3-max&sayfa=",
             type="string",
         ),
+        "hb_pages": Param(
+            1, type="integer", description="HB Sayfa Sayısı- Her sayfa 36 ürün içerir"
+        ),
         "ty_url": Param(
             "https://www.trendyol.com/sr?wc=103108%2C106084&sst=MOST_RATED",
             type="string",
+        ),
+        "ty_pages": Param(
+            2, type="integer", description="TY Sayfa Sayısı - Her sayfa 16 ürün içerir"
         ),
     },
 ) as dag:

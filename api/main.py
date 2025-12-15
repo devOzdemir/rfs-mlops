@@ -10,82 +10,77 @@ from api.schemas import LaptopInput
 
 # Global değişkenler
 model_pipeline = None
+dropdown_options = {}
+model_metadata = {
+    "name": "Unknown",
+    "version": "0",
+}  # <-- YENİ: Model bilgisini tutacak
 
 
-def load_champion_model():
-    """MLflow'dan @champion etiketli modeli indirir."""
+def load_champion_assets():
+    global model_pipeline, dropdown_options, model_metadata
     try:
         print("🔌 MLflow'a bağlanılıyor...")
         tracking_uri = os.getenv("MLFLOW_TRACKING_URI", "http://rfs_mlflow:5000")
         mlflow.set_tracking_uri(tracking_uri)
 
-        model_uri = "models:/RFS_Laptop_Price_Predictor@champion"
-        print(f"📥 Model indiriliyor: {model_uri}")
+        # 1. Model Bilgilerini ve Kendisini Al
+        model_name = "RFS_Laptop_Price_Predictor"
+        model_alias = "champion"
+
+        # Versiyon bilgisini MLflow'dan çek
+        client = mlflow.tracking.MlflowClient()
+        model_version_info = client.get_model_version_by_alias(model_name, model_alias)
+
+        # Metadata'yı güncelle
+        model_metadata = {
+            "name": model_name,
+            "version": model_version_info.version,
+            "run_id": model_version_info.run_id,
+        }
 
         # Modeli yükle
-        loaded_model = mlflow.sklearn.load_model(model_uri)
-        print("✅ Model başarıyla hafızaya yüklendi!")
-        return loaded_model
+        model_uri = f"models:/{model_name}@{model_alias}"
+        print(f"📥 Model indiriliyor: {model_uri} (v{model_metadata['version']})")
+        model_pipeline = mlflow.sklearn.load_model(model_uri)
+
+        # 2. Seçenekler JSON'ını İndir
+        run_id = model_version_info.run_id
+        local_path = mlflow.artifacts.download_artifacts(
+            run_id=run_id, artifact_path="categorical_options.json"
+        )
+
+        with open(local_path, "r", encoding="utf-8") as f:
+            dropdown_options = json.load(f)
+
+        print("✅ Yükleme Tamamlandı!")
+
     except Exception as e:
-        print(f"❌ Model yükleme hatası: {e}")
-        return None
+        print(f"⚠️ Yükleme hatası: {e}")
+        dropdown_options = {}
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
-    global model_pipeline
-    model_pipeline = load_champion_model()
+    load_champion_assets()
     yield
-    # Shutdown
     print("🛑 API Kapanıyor...")
 
 
-app = FastAPI(title="RFS Laptop Price Prediction API", version="1.0", lifespan=lifespan)
+app = FastAPI(title="RFS API", version="1.0", lifespan=lifespan)
 
 
+# ... (Health ve Info endpointleri AYNI kalacak) ...
 @app.get("/health")
 def health_check():
     if model_pipeline is None:
-        return {"status": "unhealthy", "detail": "Model not loaded"}
-    return {"status": "healthy", "model": "champion"}
+        return {"status": "unhealthy"}
+    return {"status": "healthy", "model": model_metadata}
 
 
 @app.get("/info")
 def get_options():
-    """Frontend dropdownları için statik listeler (Geliştirilebilir)"""
-    return {
-        "brands": ["Asus", "Lenovo", "HP", "MSI", "Apple", "Dell", "Acer", "Monster"],
-        "operating_systems": [
-            "Windows 11 Home",
-            "Windows 11 Pro",
-            "FreeDOS",
-            "macOS",
-            "Linux",
-        ],
-        "cpu_families": [
-            "Core i3",
-            "Core i5",
-            "Core i7",
-            "Core i9",
-            "Ryzen 3",
-            "Ryzen 5",
-            "Ryzen 7",
-            "Ryzen 9",
-            "M1",
-            "M2",
-            "M3",
-        ],
-        "gpu_models": [
-            "RTX 4050",
-            "RTX 4060",
-            "RTX 4070",
-            "RTX 3050",
-            "RTX 3060",
-            "Integrated",
-        ],
-        "panel_types": ["IPS", "OLED", "TN", "VA"],
-    }
+    return dropdown_options
 
 
 @app.post("/predict")
@@ -93,51 +88,28 @@ def predict_price(input_data: LaptopInput):
     if not model_pipeline:
         raise HTTPException(status_code=503, detail="Model hizmete hazır değil.")
 
+    # ... (Veri işleme ve PPI hesaplama kısımları AYNI kalsın) ...
+    data_dict = input_data.model_dump()
+    res_str = data_dict.pop("resolution")
     try:
-        # 1. Pydantic verisini Dictionary'e çevir
-        data_dict = input_data.model_dump()
+        w, h = map(int, res_str.lower().split("x"))
+        inches = data_dict.get("screen_size_inch", 15.6)
+        ppi = math.sqrt(w**2 + h**2) / inches
+        data_dict["ppi"] = ppi
+    except Exception:
+        data_dict["ppi"] = np.nan
 
-        # 2. FEATURE ENGINEERING: PPI Hesapla
-        # Kullanıcıdan 'resolution' ve 'screen_size_inch' aldık.
-        # Bunlardan 'ppi' türetip, 'resolution'ı sileceğiz.
-        res_str = data_dict.pop("resolution")  # Listeden çıkar ve al
+    df = pd.DataFrame([data_dict])
+    df.fillna(value=np.nan, inplace=True)
 
-        try:
-            # "1920x1080" stringini parçala
-            w, h = map(int, res_str.lower().split("x"))
-            inches = data_dict.get("screen_size_inch", 15.6)
-
-            # PPI Formülü
-            ppi = math.sqrt(w**2 + h**2) / inches
-            data_dict["ppi"] = ppi
-
-        except Exception:
-            # Eğer hesaplanamazsa NaN ver (Imputer doldursun)
-            data_dict["ppi"] = np.nan
-
-        # 3. DataFrame Oluştur ve Hazırla
-        df = pd.DataFrame([data_dict])
-
-        # Pydantic'ten gelen None değerlerini NumPy NaN yap
-        # (Scikit-Learn Imputer, None'ı her zaman tanımaz, NaN sever)
-        df.fillna(value=np.nan, inplace=True)
-
-        # 4. Tahmin Yap
+    try:
         prediction = model_pipeline.predict(df)
-        predicted_price = float(prediction[0])
 
+        # CEVAP JSON'INI GÜNCELLİYORUZ
         return {
-            "predicted_price_try": round(predicted_price, 2),
+            "predicted_price_try": round(float(prediction[0]), 2),
             "currency": "TRY",
-            "debug_info": {
-                "calculated_ppi": round(data_dict["ppi"], 2)
-                if not np.isnan(data_dict["ppi"])
-                else None
-            },
+            "model_info": f"{model_metadata['name']} (v{model_metadata['version']})",  # <-- YENİ
         }
-
     except Exception as e:
-        import traceback
-
-        traceback.print_exc()  # Loglara detaylı hata bas
-        raise HTTPException(status_code=500, detail=f"Tahmin motoru hatası: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))

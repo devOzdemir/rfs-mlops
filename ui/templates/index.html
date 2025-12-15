@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RFS – Laptop Fiyat Tahmini</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root{
+      --rfs-orange-1:#FF6000; 
+      --rfs-orange-2:#F27A1A;
+      --rfs-accent:#F27A1A;
+      --rfs-bg:#fafafa;
+    }
+    body{background:var(--rfs-bg)}
+    .navbar{background: linear-gradient(90deg, var(--rfs-orange-1), var(--rfs-orange-2));}
+    .card{border:none; box-shadow:0 4px 12px rgba(0,0,0,0.05); margin-bottom: 20px;}
+    .card-header{background: #fff; border-bottom: 2px solid #f0f0f0; font-weight: 700; color: #333;}
+    .btn-primary{background:var(--rfs-accent); border:none; padding: 10px 30px; font-weight: 600;}
+    .btn-primary:hover{background:#d6620a;}
+    .result-box{background:#fff7f0; border:2px dashed #ffd3b3; border-radius:12px; padding: 20px; text-align: center;}
+    .form-label {font-size: 0.9rem; font-weight: 600; color: #555;}
+    
+    .nav-tabs .nav-link { color: #555; font-weight: 600; }
+    .nav-tabs .nav-link.active { color: var(--rfs-orange-1) !important; border-bottom: 3px solid var(--rfs-orange-1); }
+
+    /* Tablo Yazı Boyutu ve Hizalama */
+    .table-sm td, .table-sm th { font-size: 0.85rem; vertical-align: middle; white-space: nowrap; }
+  </style>
+</head>
+<body>
+
+  <nav class="navbar navbar-dark mb-4">
+    <div class="container">
+      <a class="navbar-brand" href="#"><i class="bi bi-laptop me-2"></i>RFS - Fiyat Tahmin Sistemi</a>
+    </div>
+  </nav>
+
+  <div class="container-fluid px-5"> {% if error %}
+    <div class="alert alert-danger">{{ error }}</div>
+    {% endif %}
+
+    <ul class="nav nav-tabs mb-4" id="myTab" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="predict-tab" data-bs-toggle="tab" data-bs-target="#predict-pane" type="button" role="tab"><i class="bi bi-calculator me-2"></i>Fiyat Tahmini</button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="history-tab" data-bs-toggle="tab" data-bs-target="#history-pane" type="button" role="tab"><i class="bi bi-clock-history me-2"></i>Geçmiş Sorgular</button>
+      </li>
+    </ul>
+
+    <div class="tab-content" id="myTabContent">
+      
+      <div class="tab-pane fade show active" id="predict-pane" role="tabpanel">
+        <div class="container"> <form method="POST" action="/">
+            <div class="row">
+               
+               <div class="col-md-6">
+                 <div class="card h-100">
+                   <div class="card-header"><i class="bi bi-tag me-2"></i>Temel Bilgiler</div>
+                   <div class="card-body row g-3">
+                     <div class="col-6">
+                        <label class="form-label">Marka</label>
+                        <select name="brand" class="form-select">
+                            <option value="" selected disabled>Seçiniz</option>
+                            {% if options.get('brand') %}
+                                {% for item in options['brand'] %}
+                                <option value="{{ item }}" {% if form_data.get('brand') == item %}selected{% endif %}>{{ item }}</option>
+                                {% endfor %}
+                            {% else %}
+                                <option>Asus</option><option>Lenovo</option>
+                            {% endif %}
+                        </select>
+                     </div>
+                      <div class="col-6">
+                        <label class="form-label">Platform</label>
+                        <select name="platform" class="form-select">
+                          <option value="Hepsiburada" {% if form_data.get('platform') == 'Hepsiburada' %}selected{% endif %}>Hepsiburada</option>
+                          <option value="Trendyol" {% if form_data.get('platform') == 'Trendyol' %}selected{% endif %}>Trendyol</option>
+                        </select>
+                      </div>
+                      <div class="col-12">
+                        <label class="form-label">İşletim Sistemi</label>
+                        <select name="operating_system" class="form-select">
+                            <option value="" selected disabled>Seçiniz</option>
+                            {% if options.get('operating_system') %}
+                                {% for item in options['operating_system'] %}
+                                <option value="{{ item }}" {% if form_data.get('operating_system') == item %}selected{% endif %}>{{ item }}</option>
+                                {% endfor %}
+                            {% else %}
+                                <option>Windows 11 Home</option>
+                            {% endif %}
+                        </select>
+                      </div>
+                   </div>
+                 </div>
+               </div>
+
+               <div class="col-md-6">
+                <div class="card h-100">
+                  <div class="card-header"><i class="bi bi-display me-2"></i>Ekran</div>
+                  <div class="card-body row g-3">
+                    <div class="col-6">
+                        <label class="form-label">Boyut (İnç)</label>
+                        <input type="number" step="0.1" name="screen_size_inch" class="form-control" value="{{ form_data.get('screen_size_inch', 15.6) }}" required>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Çözünürlük</label>
+                        <select name="resolution" class="form-select">
+                            <option value="1920x1080" {% if form_data.get('resolution') == '1920x1080' %}selected{% endif %}>FHD (1920x1080)</option>
+                            <option value="2560x1440" {% if form_data.get('resolution') == '2560x1440' %}selected{% endif %}>2K (2560x1440)</option>
+                            <option value="3840x2160" {% if form_data.get('resolution') == '3840x2160' %}selected{% endif %}>4K</option>
+                            <option value="1366x768" {% if form_data.get('resolution') == '1366x768' %}selected{% endif %}>HD</option>
+                        </select>
+                    </div>
+                     <div class="col-6">
+                        <label class="form-label">Panel Tipi</label>
+                        <select name="panel_type" class="form-select">
+                            <option value="" selected disabled>Seçiniz</option>
+                            {% if options.get('panel_type') %}
+                                {% for item in options['panel_type'] %}
+                                <option value="{{ item }}" {% if form_data.get('panel_type') == item %}selected{% endif %}>{{ item }}</option>
+                                {% endfor %}
+                            {% endif %}
+                        </select>
+                      </div>
+                      <div class="col-6">
+                        <label class="form-label">Yenileme Hızı</label>
+                        <input type="number" name="refresh_rate_hz" class="form-control" value="{{ form_data.get('refresh_rate_hz', '') }}">
+                      </div>
+                  </div>
+                </div>
+              </div>
+
+               <div class="col-md-12 mt-3">
+                <div class="card">
+                  <div class="card-header"><i class="bi bi-cpu me-2"></i>Donanım</div>
+                  <div class="card-body row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label">İşlemci Ailesi</label>
+                        <select name="cpu_family" class="form-select">
+                            <option value="" selected disabled>Seçiniz</option>
+                            {% if options.get('cpu_family') %}
+                                {% for item in options['cpu_family'] %}
+                                <option value="{{ item }}" {% if form_data.get('cpu_family') == item %}selected{% endif %}>{{ item }}</option>
+                                {% endfor %}
+                            {% endif %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Nesil</label>
+                        <input type="number" name="cpu_generation" class="form-control" value="{{ form_data.get('cpu_generation', '') }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Hız (GHz)</label>
+                        <input type="number" step="0.1" name="cpu_max_ghz" class="form-control" value="{{ form_data.get('cpu_max_ghz', '') }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">RAM (GB)</label>
+                        <input type="number" name="ram_gb" class="form-control" value="{{ form_data.get('ram_gb', 16) }}" required>
+                    </div>
+                     <div class="col-md-3">
+                        <label class="form-label">RAM Tipi</label>
+                        <select name="ram_type" class="form-select">
+                            <option value="" selected disabled>Seçiniz</option>
+                            {% if options.get('ram_type') %}
+                                {% for item in options['ram_type'] %}
+                                <option value="{{ item }}" {% if form_data.get('ram_type') == item %}selected{% endif %}>{{ item }}</option>
+                                {% endfor %}
+                            {% endif %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">SSD (GB)</label>
+                        <input type="number" name="ssd_gb" class="form-control" value="{{ form_data.get('ssd_gb', 512) }}" required>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-md-12 mt-3">
+                <div class="card">
+                  <div class="card-header"><i class="bi bi-gpu-card me-2"></i>Ekran Kartı</div>
+                  <div class="card-body row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">GPU Modeli</label>
+                        <select name="gpu_model" class="form-select">
+                            <option value="" selected disabled>Seçiniz</option>
+                            {% if options.get('gpu_model') %}
+                                {% for item in options['gpu_model'] %}
+                                <option value="{{ item }}" {% if form_data.get('gpu_model') == item %}selected{% endif %}>{{ item }}</option>
+                                {% endfor %}
+                            {% endif %}
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">VRAM (GB)</label>
+                        <input type="number" name="gpu_vram_gb" class="form-control" value="{{ form_data.get('gpu_vram_gb', '') }}">
+                    </div>
+                  </div>
+                </div>
+             </div>
+
+            </div>
+
+            <div class="d-grid gap-2 mt-4 mb-5">
+              <button type="submit" class="btn btn-primary btn-lg"><i class="bi bi-calculator me-2"></i>Fiyatı Tahmin Et</button>
+            </div>
+        </form>
+
+        {% if prediction %}
+        <div class="result-box mb-5">
+          <h4 class="text-muted">Tahmini Fiyat</h4>
+          <h1 style="color: var(--rfs-orange-1); font-weight: 800;">₺ {{ prediction }}</h1>
+          <p class="text-muted small mt-2">
+            <i class="bi bi-cpu-fill me-1"></i>
+            Hesaplama: <strong>{{ model_info }}</strong> tarafından yapılmıştır.
+          </p>
+        </div>
+        {% endif %}
+        </div>
+      </div>
+
+      <div class="tab-pane fade" id="history-pane" role="tabpanel">
+        <div class="card p-3">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="m-0"><i class="bi bi-list-columns me-2"></i>Geçmiş Tahmin Detayları</h5>
+                <button class="btn btn-sm btn-outline-danger" onclick="clearHistory()"><i class="bi bi-trash"></i> Temizle</button>
+            </div>
+            
+            <div class="table-responsive">
+                <table class="table table-hover table-bordered table-striped table-sm" id="historyTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th scope="col">Tarih</th>
+                            <th scope="col">Platform</th>
+                            <th scope="col">Marka</th>
+                            <th scope="col">OS</th>
+                            <th scope="col">İşlemci</th>
+                            <th scope="col">RAM</th>
+                            <th scope="col">SSD</th>
+                            <th scope="col">Ekran Kartı</th>
+                            <th scope="col">Ekran</th>
+                            <th scope="col" class="text-end bg-light fw-bold" style="border-left: 2px solid #dee2e6;">Tahmin (TL)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        </tbody>
+                </table>
+            </div>
+        </div>
+      </div>
+    
+    </div> </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  
+  <script>
+    // --- GEÇMİŞ YÖNETİMİ ---
+    
+    document.addEventListener("DOMContentLoaded", function() {
+        renderHistoryTable();
+        
+        // Flask'tan gelen verileri JS değişkenlerine al
+        const prediction = "{{ prediction }}";
+        const modelInfo = "{{ model_info }}";
+        
+        // Eğer tahmin varsa (None değilse), yeni bir kayıt oluştur
+        if (prediction && prediction !== "None") {
+            // Form verilerini eksiksiz alıyoruz
+            const entry = {
+                date: new Date().toLocaleString("tr-TR"),
+                brand: "{{ form_data.get('brand') }}",
+                platform: "{{ form_data.get('platform') }}",
+                os: "{{ form_data.get('operating_system') }}",
+                
+                // Donanım
+                cpu_family: "{{ form_data.get('cpu_family') }}",
+                cpu_gen: "{{ form_data.get('cpu_generation') }}",
+                ram_gb: "{{ form_data.get('ram_gb') }}",
+                ssd_gb: "{{ form_data.get('ssd_gb') }}",
+                
+                // GPU
+                gpu_model: "{{ form_data.get('gpu_model') }}",
+                
+                // Ekran
+                screen: "{{ form_data.get('screen_size_inch') }}",
+                resolution: "{{ form_data.get('resolution') }}",
+                
+                price: prediction,
+                model: modelInfo
+            };
+            saveToHistory(entry);
+        }
+    });
+
+    function saveToHistory(item) {
+        let history = JSON.parse(localStorage.getItem("rfs_full_history") || "[]");
+        history.unshift(item);
+        if (history.length > 50) history = history.slice(0, 50); // Son 50 kayıt
+        localStorage.setItem("rfs_full_history", JSON.stringify(history));
+        renderHistoryTable();
+    }
+
+    function renderHistoryTable() {
+        const history = JSON.parse(localStorage.getItem("rfs_full_history") || "[]");
+        const tbody = document.querySelector("#historyTable tbody");
+        tbody.innerHTML = "";
+
+        if (history.length === 0) {
+            tbody.innerHTML = "<tr><td colspan='10' class='text-center text-muted py-4'>Henüz kayıt bulunamadı.</td></tr>";
+            return;
+        }
+
+        history.forEach(item => {
+            // Boş gelen veriler için tire (-) koyalım
+            const formatVal = (val) => val && val !== 'None' ? val : '-';
+
+            const row = `
+                <tr>
+                    <td class="small text-muted">${item.date}</td>
+                    <td>${formatVal(item.platform)}</td>
+                    <td class="fw-bold">${formatVal(item.brand)}</td>
+                    <td class="small">${formatVal(item.os)}</td>
+                    <td class="small">
+                        ${formatVal(item.cpu_family)} 
+                        ${item.cpu_gen ? '('+item.cpu_gen+'.Nesil)' : ''}
+                    </td>
+                    <td>${formatVal(item.ram_gb)} GB</td>
+                    <td>${formatVal(item.ssd_gb)} GB</td>
+                    <td class="small">${formatVal(item.gpu_model)}</td>
+                    <td class="small">${formatVal(item.screen)}" ${formatVal(item.resolution)}</td>
+                    
+                    <td class="text-end fw-bold text-success fs-6" style="border-left: 2px solid #dee2e6;">
+                        ₺ ${item.price}
+                    </td>
+                </tr>
+            `;
+            tbody.innerHTML += row;
+        });
+    }
+
+    function clearHistory() {
+        if(confirm("Tüm tahmin geçmişi silinsin mi?")) {
+            localStorage.removeItem("rfs_full_history");
+            renderHistoryTable();
+        }
+    }
+  </script>
+
+</body>
+</html>
