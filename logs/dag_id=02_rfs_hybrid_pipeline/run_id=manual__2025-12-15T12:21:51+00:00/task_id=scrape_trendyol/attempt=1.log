@@ -1,0 +1,37 @@
+[2025-12-15T12:22:05.228+0000] {local_task_job_runner.py:123} INFO - ::group::Pre task execution logs
+[2025-12-15T12:22:05.237+0000] {taskinstance.py:2613} INFO - Dependencies all met for dep_context=non-requeueable deps ti=<TaskInstance: 02_rfs_hybrid_pipeline.scrape_trendyol manual__2025-12-15T12:21:51+00:00 [queued]>
+[2025-12-15T12:22:05.241+0000] {taskinstance.py:2613} INFO - Dependencies all met for dep_context=requeueable deps ti=<TaskInstance: 02_rfs_hybrid_pipeline.scrape_trendyol manual__2025-12-15T12:21:51+00:00 [queued]>
+[2025-12-15T12:22:05.241+0000] {taskinstance.py:2866} INFO - Starting attempt 1 of 1
+[2025-12-15T12:22:05.247+0000] {taskinstance.py:2889} INFO - Executing <Task(SSHOperator): scrape_trendyol> on 2025-12-15 12:21:51+00:00
+[2025-12-15T12:22:05.252+0000] {logging_mixin.py:190} WARNING - /home/airflow/.local/lib/python3.12/site-packages/airflow/task/task_runner/standard_task_runner.py:70 DeprecationWarning: This process (pid=228) is multi-threaded, use of fork() may lead to deadlocks in the child.
+[2025-12-15T12:22:05.252+0000] {standard_task_runner.py:72} INFO - Started process 251 to run task
+[2025-12-15T12:22:05.252+0000] {standard_task_runner.py:104} INFO - Running: ['airflow', 'tasks', 'run', '02_rfs_hybrid_pipeline', 'scrape_trendyol', 'manual__2025-12-15T12:21:51+00:00', '--job-id', '3', '--raw', '--subdir', 'DAGS_FOLDER/01_rfs_hybrid_pipeline.py', '--cfg-path', '/tmp/tmpickximcl']
+[2025-12-15T12:22:05.254+0000] {standard_task_runner.py:105} INFO - Job 3: Subtask scrape_trendyol
+[2025-12-15T12:22:05.275+0000] {task_command.py:467} INFO - Running <TaskInstance: 02_rfs_hybrid_pipeline.scrape_trendyol manual__2025-12-15T12:21:51+00:00 [running]> on host b36233c36284
+[2025-12-15T12:22:05.311+0000] {taskinstance.py:3132} INFO - Exporting env vars: AIRFLOW_CTX_DAG_OWNER='rfs_team' AIRFLOW_CTX_DAG_ID='02_rfs_hybrid_pipeline' AIRFLOW_CTX_TASK_ID='scrape_trendyol' AIRFLOW_CTX_EXECUTION_DATE='2025-12-15T12:21:51+00:00' AIRFLOW_CTX_TRY_NUMBER='1' AIRFLOW_CTX_DAG_RUN_ID='manual__2025-12-15T12:21:51+00:00'
+[2025-12-15T12:22:05.312+0000] {taskinstance.py:731} INFO - ::endgroup::
+[2025-12-15T12:22:05.326+0000] {ssh.py:124} INFO - ssh_hook is not provided or invalid. Trying ssh_conn_id to create SSHHook.
+[2025-12-15T12:22:05.331+0000] {base.py:84} INFO - Retrieving connection 'my_local_mac'
+[2025-12-15T12:22:05.331+0000] {ssh.py:312} WARNING - No Host Key Verification. This won't protect against Man-In-The-Middle attacks
+[2025-12-15T12:22:05.418+0000] {transport.py:1944} INFO - Connected (version 2.0, client OpenSSH_10.0)
+[2025-12-15T12:22:05.686+0000] {transport.py:1944} INFO - Authentication (password) successful!
+[2025-12-15T12:22:05.688+0000] {ssh.py:497} INFO - Running command: 
+            export DISPLAY=:0 && 
+            cd /Users/erwin/Developer/ml-dl/rfs-mlops && 
+            /Users/erwin/Developer/ml-dl/rfs-mlops/.venv/bin/python run_scraping.py             --site ty             --ty-pages 2             --ty-url "https://www.trendyol.com/sr?wc=103108%2C106084&sst=MOST_RATED"
+        
+[2025-12-15T12:22:06.758+0000] {ssh.py:548} WARNING - 2025-12-15 15:22:06,757 [INFO] WebDriver başlatılıyor...
+[2025-12-15T12:22:08.675+0000] {ssh.py:548} WARNING - 2025-12-15 15:22:08,675 [INFO] Link toplama: Sayfa 1 işleniyor (https://www.trendyol.com/sr?wc=103108%2C106084&sst=MOST_RATED&pi=1)...
+[2025-12-15T12:22:10.705+0000] {ssh.py:548} WARNING - 2025-12-15 15:22:10,703 [INFO] Link toplama: Sayfa 2 işleniyor (https://www.trendyol.com/sr?wc=103108%2C106084&sst=MOST_RATED&pi=2)...
+[2025-12-15T12:22:11.602+0000] {ssh.py:548} WARNING - 2025-12-15 15:22:11,604 [INFO] [DB] Veri links.ty tablosuna basıldı. (36 satır)
+[2025-12-15T12:22:25.528+0000] {ssh.py:548} WARNING - 2025-12-15 15:22:25,528 [INFO] Detay toplama: 10/36 tamamlandı.
+[2025-12-15T12:22:44.136+0000] {ssh.py:548} WARNING - 2025-12-15 15:22:44,137 [INFO] Detay toplama: 20/36 tamamlandı.
+[2025-12-15T12:23:08.649+0000] {ssh.py:548} WARNING - 2025-12-15 15:23:08,562 [INFO] Detay toplama: 30/36 tamamlandı.
+[2025-12-15T12:23:19.836+0000] {ssh.py:548} WARNING - 2025-12-15 15:23:19,833 [INFO] [DB] Veri raw.ty tablosuna basıldı. (36 satır)
+[2025-12-15T12:23:19.856+0000] {ssh.py:548} WARNING - 2025-12-15 15:23:19,833 [INFO] WebDriver kapatılıyor...
+[2025-12-15T12:23:20.214+0000] {ssh.py:543} INFO - >>> Trendyol başlıyor... (Sayfa: 2)
+[2025-12-15T12:23:20.286+0000] {taskinstance.py:340} INFO - ::group::Post task execution logs
+[2025-12-15T12:23:20.286+0000] {taskinstance.py:352} INFO - Marking task as SUCCESS. dag_id=02_rfs_hybrid_pipeline, task_id=scrape_trendyol, run_id=manual__2025-12-15T12:21:51+00:00, execution_date=20251215T122151, start_date=20251215T122205, end_date=20251215T122320
+[2025-12-15T12:23:20.312+0000] {local_task_job_runner.py:266} INFO - Task exited with return code 0
+[2025-12-15T12:23:20.324+0000] {taskinstance.py:3895} INFO - 0 downstream tasks scheduled from follow-on schedule check
+[2025-12-15T12:23:20.325+0000] {local_task_job_runner.py:245} INFO - ::endgroup::

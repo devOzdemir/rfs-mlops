@@ -26,5 +26,7 @@ beautifulsoup4
 # --- API ve Arayüz ---
 fastapi
 uvicorn
-streamlit
 pyyaml
+Flask
+requests
+gunicorn

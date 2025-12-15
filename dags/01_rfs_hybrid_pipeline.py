@@ -77,7 +77,7 @@ def run_model_training():
 # --- DAG TANIMI ---
 
 with DAG(
-    dag_id="02_rfs_hybrid_pipeline",
+    dag_id="01_rfs_hybrid_pipeline",
     default_args=default_args,
     description="Host(Scraping) -> Docker(ETL) -> Docker(Training)",
     schedule_interval=None,

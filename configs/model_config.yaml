@@ -20,14 +20,14 @@ data_config:
     - "color"          # Renk fiyata az etki eder, kapalı kalsın
     - "weight"         # Ağırlık
     #- "panel_type"     # IPS/TN/OLED
-    #- "display_standard" # FHD/4K
+    - "display_standard" # FHD/4K
     
     # --- C. Donanım Özellikleri ---
     #- "operating_system"
     #- "cpu_family"       # i5, i7, Ryzen 5...
     - "cpu_model"        # 13500H, 5600U...
     #- "cpu_generation"   # 13. Nesil (Bazen modelden çıkarılabilir)
-    #- "cpu_cores"
+    - "cpu_cores"
     #- "cpu_max_ghz"
     #- "ram_gb"           # Kritik
     #- "ram_type"         # DDR4/DDR5
@@ -38,7 +38,7 @@ data_config:
     #- "gpu_vram_gb"      # Ekran kartı hafızası
     - "gpu_vram_type"    # GDDR6
     #- "screen_size_inch"
-    #- "resolution"       # 1920x1080
+    - "resolution"       # 1920x1080
     #- "ppi"              # Piksel yoğunluğu (Hesaplanmış veri)
     #- "refresh_rate_hz"  # 144Hz, 60Hz
 

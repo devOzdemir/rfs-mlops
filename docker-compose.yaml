@@ -189,6 +189,32 @@ services:
       postgres:
         condition: service_healthy
 
+  # ==========================================
+  # 5. MODEL SERVING (FastAPI)
+  # ==========================================
+  api:
+    build:
+      context: .
+      dockerfile: ./docker/api/Dockerfile
+    container_name: rfs_api
+    restart: always
+    networks:
+      - rfs_network
+    ports:
+      - "8000:8000"
+    environment:
+      # MLflow'u nerede bulacak?
+      MLFLOW_TRACKING_URI: http://rfs_mlflow:5000
+      
+      # MinIO (Artifacts) nerede bulacak? (Çok Önemli!)
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+      AWS_ACCESS_KEY_ID: ${MINIO_ACCESS_KEY}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_SECRET_KEY}
+    depends_on:
+      mlflow:
+        condition: service_started
 volumes:
   postgres_data:
   minio_data:
+
+  

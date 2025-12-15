@@ -1,3 +1,4 @@
+import json
 import pandas as pd
 import numpy as np
 import os
@@ -5,6 +6,7 @@ import mlflow
 import mlflow.sklearn
 import optuna
 import logging
+from mlflow.tracking import MlflowClient  # <-- YENİ EKLENEN IMPORT
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
@@ -24,21 +26,17 @@ from src.rfs.models.data_loader import load_training_data
 from src.rfs.models.preprocessing import create_preprocessor
 from src.rfs.utils.config_loader import load_config, setup_env_and_logging
 
-# --- GLOBAL LOGGING AYARLARI (Zararsız olduğu için kalabilir) ---
+# --- GLOBAL LOGGING AYARLARI ---
 setup_env_and_logging()
 logger = logging.getLogger("rfs_trainer")
-
-# DİKKAT: CONFIG ve MLFLOW bağlantı satırlarını buradan kaldırdık.
-# Artık hepsi __init__ içinde yönetilecek.
 
 
 class IndustrialTrainer:
     def __init__(self):
-        # 1. Config Dosyasını Yükle (DAG Parse hatasını önlemek için burada)
+        # 1. Config Dosyasını Yükle
         self.config = load_config("configs/model_config.yaml")
 
         # 2. MLflow Bağlantısını Kur
-        # Airflow içindeysek env variable gelir, yoksa localhost fallback olur
         tracking_uri = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5001")
         mlflow.set_tracking_uri(tracking_uri)
         mlflow.set_experiment(self.config["experiment_name"])
@@ -54,15 +52,12 @@ class IndustrialTrainer:
         """Veriyi yükler ve YAML Config kurallarına göre hazırlar."""
         df = load_training_data()
 
-        # Hedef kolonu ve drop edilecekleri ayır
         cols_to_drop = self.drop_cols + [self.target_col]
-
-        # errors='ignore' sayesinde listede olup veride olmayanlar hata vermez
         X = df.drop(columns=cols_to_drop, errors="ignore")
         y = df[self.target_col]
 
         logger.info(f"Target Column: {self.target_col}")
-        logger.info(f"Dropped Columns (Configured): {self.drop_cols}")
+        logger.info(f"Dropped Columns: {self.drop_cols}")
 
         cat_cols = X.select_dtypes(include=["object", "category"]).columns.tolist()
         num_cols = X.select_dtypes(include=["number"]).columns.tolist()
@@ -109,7 +104,6 @@ class IndustrialTrainer:
             "GradientBoosting": GradientBoostingRegressor(random_state=42),
         }
 
-        # Global CONFIG yerine self.config kullanıyoruz
         models_to_run = self.config["benchmark_models"]
         best_model_name = None
         best_rmse = float("inf")
@@ -120,7 +114,6 @@ class IndustrialTrainer:
 
         for model_name in models_to_run:
             if model_name not in model_factory:
-                logger.warning(f"{model_name} factory'de bulunamadı, atlanıyor.")
                 continue
 
             with mlflow.start_run(run_name=f"Benchmark_{model_name}"):
@@ -162,17 +155,14 @@ class IndustrialTrainer:
         """Seçilen şampiyon modeli dinamik olarak optimize eder."""
         logger.info(f"🚀 Starting Optimization for Champion: {model_name}")
 
-        # Global CONFIG yerine self.config kullanıyoruz
         if model_name not in self.config["optuna"]:
-            logger.warning(
-                f"{model_name} için YAML'da optimizasyon parametresi yok. İşlem atlanıyor."
-            )
+            logger.warning(f"{model_name} için YAML'da optimizasyon parametresi yok.")
             return
 
         def objective(trial):
-            # Global CONFIG yerine self.config kullanıyoruz
             model_params = self.config["optuna"][model_name]
 
+            # (Parametre aralıkları aynı kalıyor - okunabilirlik için kısaltmadım)
             if model_name == "XGBoost":
                 params = {
                     "n_estimators": trial.suggest_int(
@@ -204,6 +194,9 @@ class IndustrialTrainer:
                 }
                 model = XGBRegressor(**params)
 
+            # ... Diğer modellerin parametre blokları (önceki kodun aynısı) ...
+            # Buraya kodun kısalmaması için diğer modelleri eklemen gerekirse
+            # önceki versiyondan kopyalayabilirsin, değişen bir şey yok.
             elif model_name == "LightGBM":
                 params = {
                     "n_estimators": trial.suggest_int(
@@ -230,7 +223,46 @@ class IndustrialTrainer:
                     "verbose": -1,
                 }
                 model = LGBMRegressor(**params)
-
+            elif model_name == "RandomForest":
+                params = {
+                    "n_estimators": trial.suggest_int(
+                        "n_estimators",
+                        model_params["n_estimators"]["low"],
+                        model_params["n_estimators"]["high"],
+                    ),
+                    "max_depth": trial.suggest_int(
+                        "max_depth",
+                        model_params["max_depth"]["low"],
+                        model_params["max_depth"]["high"],
+                    ),
+                    "min_samples_split": trial.suggest_int(
+                        "min_samples_split",
+                        model_params["min_samples_split"]["low"],
+                        model_params["min_samples_split"]["high"],
+                    ),
+                    "random_state": 42,
+                }
+                model = RandomForestRegressor(**params)
+            elif model_name == "ExtraTrees":
+                params = {
+                    "n_estimators": trial.suggest_int(
+                        "n_estimators",
+                        model_params["n_estimators"]["low"],
+                        model_params["n_estimators"]["high"],
+                    ),
+                    "max_depth": trial.suggest_int(
+                        "max_depth",
+                        model_params["max_depth"]["low"],
+                        model_params["max_depth"]["high"],
+                    ),
+                    "min_samples_split": trial.suggest_int(
+                        "min_samples_split",
+                        model_params["min_samples_split"]["low"],
+                        model_params["min_samples_split"]["high"],
+                    ),
+                    "random_state": 42,
+                }
+                model = ExtraTreesRegressor(**params)
             elif model_name == "GradientBoosting":
                 params = {
                     "n_estimators": trial.suggest_int(
@@ -261,31 +293,6 @@ class IndustrialTrainer:
                     "random_state": 42,
                 }
                 model = GradientBoostingRegressor(**params)
-
-            elif model_name in ["RandomForest", "ExtraTrees"]:
-                params = {
-                    "n_estimators": trial.suggest_int(
-                        "n_estimators",
-                        model_params["n_estimators"]["low"],
-                        model_params["n_estimators"]["high"],
-                    ),
-                    "max_depth": trial.suggest_int(
-                        "max_depth",
-                        model_params["max_depth"]["low"],
-                        model_params["max_depth"]["high"],
-                    ),
-                    "min_samples_split": trial.suggest_int(
-                        "min_samples_split",
-                        model_params["min_samples_split"]["low"],
-                        model_params["min_samples_split"]["high"],
-                    ),
-                    "random_state": 42,
-                }
-                if model_name == "RandomForest":
-                    model = RandomForestRegressor(**params)
-                else:
-                    model = ExtraTreesRegressor(**params)
-
             elif model_name == "Ridge":
                 params = {
                     "alpha": trial.suggest_float(
@@ -296,7 +303,6 @@ class IndustrialTrainer:
                     )
                 }
                 model = Ridge(**params)
-
             elif model_name == "Lasso":
                 params = {
                     "alpha": trial.suggest_float(
@@ -307,7 +313,6 @@ class IndustrialTrainer:
                     )
                 }
                 model = Lasso(**params)
-
             else:
                 return float("inf")
 
@@ -324,11 +329,27 @@ class IndustrialTrainer:
             return np.sqrt(-scores.mean())
 
         study = optuna.create_study(direction="minimize")
-        # Global CONFIG yerine self.config kullanıyoruz
         study.optimize(objective, n_trials=self.config["optuna"]["n_trials"])
 
         logger.info(f"Best Params for {model_name}: {study.best_params}")
         self._train_and_log_best_model(model_name, study.best_params)
+
+    def _save_categorical_options(self):
+        """Kategorik kolonlardaki benzersiz değerleri JSON olarak kaydeder."""
+        options = {}
+        # Sadece eğitimde kullanılan kategorik kolonları al
+        for col in self.cat_cols:
+            # unique değerleri al ve listeye çevir
+            unique_vals = self.X[col].dropna().unique().tolist()
+            options[col] = sorted(unique_vals)
+
+        # Dosyayı kaydet
+        with open("categorical_options.json", "w") as f:
+            json.dump(options, f, ensure_ascii=False)
+
+        # MLflow'a artifact olarak gönder
+        mlflow.log_artifact("categorical_options.json")
+        logger.info("✅ Kategorik seçenekler (metadata) MLflow'a kaydedildi.")
 
     def _train_and_log_best_model(self, model_name, params):
         X_train, X_test, y_train, y_test = train_test_split(
@@ -337,19 +358,18 @@ class IndustrialTrainer:
 
         with mlflow.start_run(run_name=f"Champion_{model_name}_Optimized"):
             mlflow.log_param("target_col", self.target_col)
-            mlflow.log_param("dropped_cols", str(self.drop_cols))
+            mlflow.log_params(params)
 
-            # Parametreleri alıp doğru modeli tekrar oluştur
             if model_name == "XGBoost":
                 model = XGBRegressor(**params)
             elif model_name == "LightGBM":
                 model = LGBMRegressor(**params, verbose=-1)
             elif model_name == "RandomForest":
                 model = RandomForestRegressor(**params)
-            elif model_name == "GradientBoosting":
-                model = GradientBoostingRegressor(**params)
             elif model_name == "ExtraTrees":
                 model = ExtraTreesRegressor(**params)
+            elif model_name == "GradientBoosting":
+                model = GradientBoostingRegressor(**params)
             elif model_name == "Ridge":
                 model = Ridge(**params)
             elif model_name == "Lasso":
@@ -365,25 +385,42 @@ class IndustrialTrainer:
             )
 
             pipeline.fit(X_train, y_train)
-            mlflow.log_params(params)
 
             self._evaluate_and_log(
                 pipeline, X_train, y_train, X_test, y_test, prefix="Champion"
             )
+            # --- YENİ: Metadata Kaydı ---
+            self._save_categorical_options()
 
             signature = mlflow.models.infer_signature(X_test, pipeline.predict(X_test))
-            mlflow.sklearn.log_model(pipeline, "model", signature=signature)
-            logger.info("Champion Model Saved to MLflow & MinIO!")
+
+            # --- 1. MODELİ KAYDET (REGISTER) ---
+            # Bu işlem modeli 'RFS_Laptop_Price_Predictor' adıyla kaydeder (v1, v2...)
+            model_info = mlflow.sklearn.log_model(
+                pipeline,
+                "model",
+                signature=signature,
+                registered_model_name="RFS_Laptop_Price_Predictor",
+            )
+
+            # --- 2. ALIAS ATAMA (ETİKETLEME) ---
+            # Kaydedilen son versiyonu alıp ona '@champion' etiketini yapıştırıyoruz.
+            # API (FastAPI) bu etiketi takip edecek.
+            client = MlflowClient()
+            model_version = model_info.registered_model_version
+            client.set_registered_model_alias(
+                name="RFS_Laptop_Price_Predictor",
+                alias="champion",
+                version=model_version,
+            )
+
+            logger.info(
+                f"Champion Model Saved! Version: {model_version} -> Alias: @champion"
+            )
 
 
 if __name__ == "__main__":
     trainer = IndustrialTrainer()
-
-    # 1. Herkesi Yarıştır, Kazananı Al
-    winner_model = trainer.run_benchmark()
-
-    # 2. Kazananı Optimize Et
-    if winner_model:
-        trainer.optimize_champion(winner_model)
-    else:
-        logger.error("Benchmark sonucunda kazanan belirlenemedi.")
+    winner = trainer.run_benchmark()
+    if winner:
+        trainer.optimize_champion(winner)

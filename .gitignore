@@ -31,4 +31,3 @@ mlruns/
 !logs/.gitkeep
 !dags/.gitkeep
 !plugins/.gitkeep
-logs/*

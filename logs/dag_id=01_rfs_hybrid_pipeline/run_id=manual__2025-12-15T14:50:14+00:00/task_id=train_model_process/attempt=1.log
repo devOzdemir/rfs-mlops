@@ -1,0 +1,90 @@
+[2025-12-15T14:52:44.270+0000] {local_task_job_runner.py:123} INFO - ::group::Pre task execution logs
+[2025-12-15T14:52:44.275+0000] {taskinstance.py:2613} INFO - Dependencies all met for dep_context=non-requeueable deps ti=<TaskInstance: 01_rfs_hybrid_pipeline.train_model_process manual__2025-12-15T14:50:14+00:00 [queued]>
+[2025-12-15T14:52:44.278+0000] {taskinstance.py:2613} INFO - Dependencies all met for dep_context=requeueable deps ti=<TaskInstance: 01_rfs_hybrid_pipeline.train_model_process manual__2025-12-15T14:50:14+00:00 [queued]>
+[2025-12-15T14:52:44.279+0000] {taskinstance.py:2866} INFO - Starting attempt 1 of 1
+[2025-12-15T14:52:44.283+0000] {taskinstance.py:2889} INFO - Executing <Task(PythonOperator): train_model_process> on 2025-12-15 14:50:14+00:00
+[2025-12-15T14:52:44.287+0000] {logging_mixin.py:190} WARNING - /home/airflow/.local/lib/python3.12/site-packages/airflow/task/task_runner/standard_task_runner.py:70 DeprecationWarning: This process (pid=1389) is multi-threaded, use of fork() may lead to deadlocks in the child.
+[2025-12-15T14:52:44.288+0000] {standard_task_runner.py:72} INFO - Started process 1400 to run task
+[2025-12-15T14:52:44.287+0000] {standard_task_runner.py:104} INFO - Running: ['airflow', 'tasks', 'run', '01_rfs_hybrid_pipeline', 'train_model_process', 'manual__2025-12-15T14:50:14+00:00', '--job-id', '13', '--raw', '--subdir', 'DAGS_FOLDER/01_rfs_hybrid_pipeline.py', '--cfg-path', '/tmp/tmpfmqbwsjo']
+[2025-12-15T14:52:44.289+0000] {standard_task_runner.py:105} INFO - Job 13: Subtask train_model_process
+[2025-12-15T14:52:44.308+0000] {task_command.py:467} INFO - Running <TaskInstance: 01_rfs_hybrid_pipeline.train_model_process manual__2025-12-15T14:50:14+00:00 [running]> on host df6aa8942030
+[2025-12-15T14:52:44.335+0000] {taskinstance.py:3132} INFO - Exporting env vars: AIRFLOW_CTX_DAG_OWNER='rfs_team' AIRFLOW_CTX_DAG_ID='01_rfs_hybrid_pipeline' AIRFLOW_CTX_TASK_ID='train_model_process' AIRFLOW_CTX_EXECUTION_DATE='2025-12-15T14:50:14+00:00' AIRFLOW_CTX_TRY_NUMBER='1' AIRFLOW_CTX_DAG_RUN_ID='manual__2025-12-15T14:50:14+00:00'
+[2025-12-15T14:52:44.336+0000] {taskinstance.py:731} INFO - ::endgroup::
+[2025-12-15T14:52:44.341+0000] {logging_mixin.py:190} INFO - 🧠 Model Eğitimi Başlıyor...
+[2025-12-15T14:52:44.357+0000] {connector.py:43} INFO - Veritabanı motoru başlatıldı. Hedef: postgres:5432/rfs_db
+[2025-12-15T14:52:44.363+0000] {data_loader.py:17} INFO - Training data loaded: 71 rows
+[2025-12-15T14:52:44.364+0000] {train.py:58} INFO - Target Column: price_try
+[2025-12-15T14:52:44.364+0000] {train.py:59} INFO - Dropped Columns: ['url', 'scraped_at', 'processed_at', 'created_at', 'title', 'intended_use', 'color', 'weight', 'cpu_model', 'hdd_gb', 'gpu_type', 'gpu_vram_type']
+[2025-12-15T14:52:44.364+0000] {train.py:93} INFO - Starting Benchmarking Mode...
+[2025-12-15T14:52:44.381+0000] {logging_mixin.py:190} WARNING - 2025/12/15 14:52:44 WARNING mlflow.utils.git_utils: Failed to import Git (the Git executable is probably not on your PATH), so Git SHA is not available. Error: Failed to initialize: Bad git executable.
+The git executable must be specified in one of the following ways:
+    - be included in your $PATH
+    - be set via $GIT_PYTHON_GIT_EXECUTABLE
+    - explicitly set via git.refresh(<full-path-to-git-executable>)
+
+All git commands will error until this is rectified.
+
+This initial message can be silenced or aggravated in the future by setting the
+$GIT_PYTHON_REFRESH environment variable. Use one of the following values:
+    - quiet|q|silence|s|silent|none|n|0: for no message or exception
+    - warn|w|warning|log|l|1: for a warning message (logging level CRITICAL, displayed by default)
+    - error|e|exception|raise|r|2: for a raised exception
+
+Example:
+    export GIT_PYTHON_REFRESH=quiet
+[2025-12-15T14:52:44.533+0000] {train.py:77} INFO - [LinearRegression] Test RMSE: 87360, Gap: 85112, MAE: 46204
+[2025-12-15T14:52:44.719+0000] {logging_mixin.py:190} WARNING - 2025/12/15 14:52:44 WARNING mlflow.models.model: `artifact_path` is deprecated. Please use `name` instead.
+[2025-12-15T14:52:46.504+0000] {credentials.py:1147} INFO - Found credentials in environment variables.
+[2025-12-15T14:52:46.559+0000] {logging_mixin.py:190} INFO - 🏃 View run Benchmark_LinearRegression at: http://rfs_mlflow:5000/#/experiments/1/runs/e9fd55e106444085bf1c06403a34c0d4
+[2025-12-15T14:52:46.560+0000] {logging_mixin.py:190} INFO - 🧪 View experiment at: http://rfs_mlflow:5000/#/experiments/1
+[2025-12-15T14:52:46.752+0000] {train.py:77} INFO - [Ridge] Test RMSE: 5201, Gap: 1150, MAE: 4049
+[2025-12-15T14:52:46.946+0000] {logging_mixin.py:190} WARNING - 2025/12/15 14:52:46 WARNING mlflow.models.model: `artifact_path` is deprecated. Please use `name` instead.
+[2025-12-15T14:52:48.465+0000] {logging_mixin.py:190} INFO - 🏃 View run Benchmark_Ridge at: http://rfs_mlflow:5000/#/experiments/1/runs/ef9792f1722046fb913c6c3a270929cc
+[2025-12-15T14:52:48.465+0000] {logging_mixin.py:190} INFO - 🧪 View experiment at: http://rfs_mlflow:5000/#/experiments/1
+[2025-12-15T14:52:48.659+0000] {logging_mixin.py:190} WARNING - /home/airflow/.local/lib/python3.12/site-packages/sklearn/linear_model/_coordinate_descent.py:716: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 1.173e+07, tolerance: 1.644e+06
+  model = cd_fast.enet_coordinate_descent(
+[2025-12-15T14:52:48.664+0000] {train.py:77} INFO - [Lasso] Test RMSE: 12328, Gap: 10071, MAE: 9784
+[2025-12-15T14:52:48.860+0000] {logging_mixin.py:190} WARNING - 2025/12/15 14:52:48 WARNING mlflow.models.model: `artifact_path` is deprecated. Please use `name` instead.
+[2025-12-15T14:52:50.335+0000] {logging_mixin.py:190} INFO - 🏃 View run Benchmark_Lasso at: http://rfs_mlflow:5000/#/experiments/1/runs/cd7a6bc84a104b9ebd57947973bde32b
+[2025-12-15T14:52:50.335+0000] {logging_mixin.py:190} INFO - 🧪 View experiment at: http://rfs_mlflow:5000/#/experiments/1
+[2025-12-15T14:52:50.582+0000] {train.py:77} INFO - [RandomForest] Test RMSE: 6083, Gap: 3178, MAE: 4666
+[2025-12-15T14:52:50.730+0000] {logging_mixin.py:190} WARNING - 2025/12/15 14:52:50 WARNING mlflow.models.model: `artifact_path` is deprecated. Please use `name` instead.
+[2025-12-15T14:52:52.206+0000] {logging_mixin.py:190} INFO - 🏃 View run Benchmark_RandomForest at: http://rfs_mlflow:5000/#/experiments/1/runs/d4fe62f0b4b4410baff6ec6b665fd03a
+[2025-12-15T14:52:52.206+0000] {logging_mixin.py:190} INFO - 🧪 View experiment at: http://rfs_mlflow:5000/#/experiments/1
+[2025-12-15T14:52:52.444+0000] {train.py:77} INFO - [ExtraTrees] Test RMSE: 4263, Gap: 4263, MAE: 3479
+[2025-12-15T14:52:52.594+0000] {logging_mixin.py:190} WARNING - 2025/12/15 14:52:52 WARNING mlflow.models.model: `artifact_path` is deprecated. Please use `name` instead.
+[2025-12-15T14:52:54.134+0000] {logging_mixin.py:190} INFO - 🏃 View run Benchmark_ExtraTrees at: http://rfs_mlflow:5000/#/experiments/1/runs/fc4f5c684dc14127bb8a993be984335e
+[2025-12-15T14:52:54.134+0000] {logging_mixin.py:190} INFO - 🧪 View experiment at: http://rfs_mlflow:5000/#/experiments/1
+[2025-12-15T14:52:54.369+0000] {train.py:77} INFO - [XGBoost] Test RMSE: 6080, Gap: 6080, MAE: 4725
+[2025-12-15T14:52:54.515+0000] {logging_mixin.py:190} WARNING - 2025/12/15 14:52:54 WARNING mlflow.models.model: `artifact_path` is deprecated. Please use `name` instead.
+[2025-12-15T14:52:56.113+0000] {logging_mixin.py:190} INFO - 🏃 View run Benchmark_XGBoost at: http://rfs_mlflow:5000/#/experiments/1/runs/66d56a958a934dec8f61d06c83a8e1a8
+[2025-12-15T14:52:56.114+0000] {logging_mixin.py:190} INFO - 🧪 View experiment at: http://rfs_mlflow:5000/#/experiments/1
+[2025-12-15T14:52:56.327+0000] {logging_mixin.py:190} WARNING - /home/airflow/.local/lib/python3.12/site-packages/sklearn/utils/validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+[2025-12-15T14:52:56.330+0000] {logging_mixin.py:190} WARNING - /home/airflow/.local/lib/python3.12/site-packages/sklearn/utils/validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+[2025-12-15T14:52:56.332+0000] {train.py:77} INFO - [LightGBM] Test RMSE: 7214, Gap: -4327, MAE: 6251
+[2025-12-15T14:52:56.527+0000] {logging_mixin.py:190} WARNING - /home/airflow/.local/lib/python3.12/site-packages/sklearn/utils/validation.py:2691: UserWarning: X does not have valid feature names, but LGBMRegressor was fitted with feature names
+  warnings.warn(
+[2025-12-15T14:52:56.529+0000] {logging_mixin.py:190} WARNING - 2025/12/15 14:52:56 WARNING mlflow.models.model: `artifact_path` is deprecated. Please use `name` instead.
+[2025-12-15T14:52:58.128+0000] {logging_mixin.py:190} INFO - 🏃 View run Benchmark_LightGBM at: http://rfs_mlflow:5000/#/experiments/1/runs/3e6c15e90a724e2a9762362c6084f2ae
+[2025-12-15T14:52:58.129+0000] {logging_mixin.py:190} INFO - 🧪 View experiment at: http://rfs_mlflow:5000/#/experiments/1
+[2025-12-15T14:52:58.172+0000] {train.py:148} INFO - 🏆 BENCHMARK WINNER: ExtraTrees with RMSE: 4262.88
+[2025-12-15T14:52:58.173+0000] {logging_mixin.py:190} INFO - 🏆 Kazanan Model: ExtraTrees
+[2025-12-15T14:52:58.173+0000] {train.py:155} INFO - 🚀 Starting Optimization for Champion: ExtraTrees
+[2025-12-15T14:53:05.827+0000] {train.py:333} INFO - Best Params for ExtraTrees: {'n_estimators': 259, 'max_depth': 17, 'min_samples_split': 7}
+[2025-12-15T14:53:06.017+0000] {train.py:77} INFO - [Champion] Test RMSE: 4700, Gap: 502, MAE: 3787
+[2025-12-15T14:53:06.126+0000] {logging_mixin.py:190} WARNING - 2025/12/15 14:53:06 WARNING mlflow.models.model: `artifact_path` is deprecated. Please use `name` instead.
+[2025-12-15T14:53:07.655+0000] {logging_mixin.py:190} WARNING - Registered model 'RFS_Laptop_Price_Predictor' already exists. Creating a new version of this model...
+[2025-12-15T14:53:07.708+0000] {logging_mixin.py:190} WARNING - 2025/12/15 14:53:07 INFO mlflow.store.model_registry.abstract_store: Waiting up to 300 seconds for model version to finish creation. Model name: RFS_Laptop_Price_Predictor, version 3
+[2025-12-15T14:53:07.708+0000] {logging_mixin.py:190} WARNING - Created version '3' of model 'RFS_Laptop_Price_Predictor'.
+[2025-12-15T14:53:07.857+0000] {train.py:397} INFO - Champion Model Saved! Version: 3 -> Alias: @champion
+[2025-12-15T14:53:07.866+0000] {logging_mixin.py:190} INFO - 🏃 View run Champion_ExtraTrees_Optimized at: http://rfs_mlflow:5000/#/experiments/1/runs/9a70e0f271434e8cbd403ba04888ead7
+[2025-12-15T14:53:07.866+0000] {logging_mixin.py:190} INFO - 🧪 View experiment at: http://rfs_mlflow:5000/#/experiments/1
+[2025-12-15T14:53:07.913+0000] {logging_mixin.py:190} INFO - ✅ Şampiyon model optimize edildi ve MLflow'a kaydedildi.
+[2025-12-15T14:53:07.913+0000] {python.py:240} INFO - Done. Returned value was: None
+[2025-12-15T14:53:07.920+0000] {taskinstance.py:340} INFO - ::group::Post task execution logs
+[2025-12-15T14:53:07.920+0000] {taskinstance.py:352} INFO - Marking task as SUCCESS. dag_id=01_rfs_hybrid_pipeline, task_id=train_model_process, run_id=manual__2025-12-15T14:50:14+00:00, execution_date=20251215T145014, start_date=20251215T145244, end_date=20251215T145307
+[2025-12-15T14:53:07.958+0000] {local_task_job_runner.py:266} INFO - Task exited with return code 0
+[2025-12-15T14:53:07.967+0000] {taskinstance.py:3895} INFO - 0 downstream tasks scheduled from follow-on schedule check
+[2025-12-15T14:53:07.967+0000] {local_task_job_runner.py:245} INFO - ::endgroup::
