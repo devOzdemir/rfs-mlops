@@ -76,21 +76,38 @@ class BaseScraper(ABC):
     def save_data(self, df: pd.DataFrame, file_prefix: str, sub_folder: str = "raw"):
         """
         Veriyi kaydeder.
-        CSV kaydı yorum satırına alındı (debugging için açılabilir).
-        DB kaydı aktif edildi.
+        Eğer 'DEMO_MODE' environment değişkeni varsa CSV kaydeder (DB'yi pas geçer).
+        Yoksa standart akış (DB) çalışır.
         """
         if df.empty:
             self.logger.warning("Kaydedilecek veri bulunamadı.")
             return
 
-        # --- 1. YÖNTEM: ESKİ CSV KAYDI (DEBUG İÇİN TUTULUYOR) ---
-        # target_dir = self.base_output_dir / sub_folder
-        # filename = f"{file_prefix}_{self.platform_name}_{self.timestamp}.csv"
-        # file_path = target_dir / filename
-        # df.to_csv(file_path, index=False)
-        # self.logger.info(f"[CSV] Veri dosyaya yazıldı: {file_path}")
+        # --- DEMO MODU KONTROLÜ (YENİ EKLENDİ) ---
+        # Demo modundaysak verileri proje içindeki 'dags/demo_data' klasörüne yazarız.
+        # Böylece hem Host makine hem de Airflow (Docker volume üzerinden) bu dosyalara erişebilir.
+        if os.getenv("DEMO_MODE") == "true":
+            try:
+                # Proje kök dizinini bulmaya çalış (veya varsayılan bir yer kullan)
+                base_path = Path(os.getcwd())
 
-        # --- 2. YÖNTEM: VERİTABANI KAYDI ---
+                # Hedef: dags/demo_data/{sub_folder}
+                demo_dir = base_path / "dags" / "demo_data" / sub_folder
+                demo_dir.mkdir(parents=True, exist_ok=True)
+
+                # Dosya adı: hb_raw.csv veya ty_raw.csv (kolay okuma için sabit isimler)
+                filename = f"{self.platform_name.lower()}_{sub_folder}.csv"
+                file_path = demo_dir / filename
+
+                df.to_csv(file_path, index=False)
+                self.logger.info(
+                    f"📢 [DEMO MODE] Veri CSV olarak kaydedildi: {file_path}"
+                )
+                return  # DB işlemine girmeden çık
+            except Exception as e:
+                self.logger.error(f"Demo CSV kaydı başarısız: {e}")
+
+        # --- NORMAL AKIŞ: VERİTABANI KAYDI ---
         if self.engine:
             try:
                 # --- Şema ve Tablo Belirleme ---
