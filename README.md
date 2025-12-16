@@ -66,8 +66,12 @@ Sistemin hibrit yapısının (Docker içinden Host makineye SSH ile bağlanıp t
 
 ```ini
 # Host makineye (Kendi bilgisayarınıza) bağlanmak için
-SSH_USER=bilgisayar_kullanici_adiniz
-SSH_PASSWORD=bilgisayar_sifreniz
+MAC_SSH_USER=bilgisayarinizin_kullanici_adi
+MAC_SSH_PASSWORD=bilgisayarinizin_sifresi
+MAC_SSH_NAME=my_local_mac # airflowdaki ad degistirmeye gerek yok 
+VENV_PYTHON_PATH=`proje dosya yolu`/rfs-mlops/.venv/bin/python
+PROJECT_PATH=`proje dosya yolu`/rfs-mlops
+MAC_EXEC_PATH=/usr/local/bin:/opt/homebrew/bin #Docker komutlari icin path degiskeni
 ```
 > Not: Bu bilgiler sadece Docker konteynerinin, Chrome tarayıcısını sizin ekranınızda (Host) açabilmesi için gereklidir. Dışarıya gönderilmez.
 
