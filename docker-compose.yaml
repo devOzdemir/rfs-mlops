@@ -153,14 +153,15 @@ services:
       -c "
       airflow db migrate &&
       airflow users create --username airflow --password airflow --firstname Admin --lastname User --role Admin --email admin@example.com;
-      airflow connections delete my_local_mac || true;
-      airflow connections add my_local_mac --conn-type ssh --conn-host host.docker.internal --conn-login ${MAC_SSH_USER} --conn-password ${MAC_SSH_PASSWORD} --conn-extra '{\"no_host_key_check\": true}'
+      airflow connections delete ${MAC_SSH_NAME} || true;
+      airflow connections add ${MAC_SSH_NAME} --conn-type ssh --conn-host host.docker.internal --conn-login ${MAC_SSH_USER} --conn-password ${MAC_SSH_PASSWORD} --conn-extra '{\"no_host_key_check\": true}'
       "
     environment:
       <<: *airflow-common-env
       _AIRFLOW_DB_MIGRATE: 'true'
       MAC_SSH_USER: ${MAC_SSH_USER}
       MAC_SSH_PASSWORD: ${MAC_SSH_PASSWORD}
+      MAC_SSH_NAME: ${MAC_SSH_NAME}
 
   airflow-webserver:
     <<: *airflow-common

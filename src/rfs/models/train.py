@@ -6,10 +6,11 @@ import mlflow
 import mlflow.sklearn
 import optuna
 import logging
-from mlflow.tracking import MlflowClient  # <-- YENİ EKLENEN IMPORT
+from mlflow.tracking import MlflowClient
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from sklearn.compose import TransformedTargetRegressor  # <-- KRİTİK EKLENTİ
 
 # Modeller
 from sklearn.linear_model import LinearRegression, Ridge, Lasso
@@ -66,9 +67,11 @@ class IndustrialTrainer:
 
     def _evaluate_and_log(self, pipeline, X_train, y_train, X_test, y_test, prefix=""):
         """Değerlendirme ve Loglama."""
+        # TransformedTargetRegressor sayesinde tahminler otomatik olarak TL'ye döner (expm1 yapılır)
         train_preds = pipeline.predict(X_train)
         test_preds = pipeline.predict(X_test)
 
+        # Hata metriklerini hesapla (Gerçek TL değerleri üzerinden)
         train_rmse = np.sqrt(mean_squared_error(y_train, train_preds))
         test_rmse = np.sqrt(mean_squared_error(y_test, test_preds))
         test_mae = mean_absolute_error(y_test, test_preds)
@@ -93,6 +96,7 @@ class IndustrialTrainer:
         """Tüm modelleri yarıştırır ve EN İYİSİNİN ADINI döndürür."""
         logger.info("Starting Benchmarking Mode...")
 
+        # Ham modeller (Henüz sarılmamış)
         model_factory = {
             "LinearRegression": LinearRegression(),
             "Ridge": Ridge(),
@@ -119,6 +123,16 @@ class IndustrialTrainer:
             with mlflow.start_run(run_name=f"Benchmark_{model_name}"):
                 mlflow.log_param("target_col", self.target_col)
                 mlflow.log_param("dropped_cols", str(self.drop_cols))
+                mlflow.log_param(
+                    "log_transform", True
+                )  # Log dönüşümü yapıldığını belirt
+
+                # 1. Modeli TransformedTargetRegressor ile sarmala
+                # Bu işlem y_train'i log1p ile dönüştürür, tahminde ise expm1 ile geri çevirir.
+                base_model = model_factory[model_name]
+                wrapped_model = TransformedTargetRegressor(
+                    regressor=base_model, func=np.log1p, inverse_func=np.expm1
+                )
 
                 pipeline = Pipeline(
                     steps=[
@@ -126,12 +140,14 @@ class IndustrialTrainer:
                             "preprocessor",
                             create_preprocessor(self.cat_cols, self.num_cols),
                         ),
-                        ("model", model_factory[model_name]),
+                        ("model", wrapped_model),
                     ]
                 )
 
+                # 2. Fit işlemi (Arka planda log dönüşümü yapılır)
                 pipeline.fit(X_train, y_train)
 
+                # 3. Değerlendirme (Predict otomatik olarak TL döner)
                 metrics = self._evaluate_and_log(
                     pipeline, X_train, y_train, X_test, y_test, prefix=model_name
                 )
@@ -162,7 +178,6 @@ class IndustrialTrainer:
         def objective(trial):
             model_params = self.config["optuna"][model_name]
 
-            # (Parametre aralıkları aynı kalıyor - okunabilirlik için kısaltmadım)
             if model_name == "XGBoost":
                 params = {
                     "n_estimators": trial.suggest_int(
@@ -194,9 +209,6 @@ class IndustrialTrainer:
                 }
                 model = XGBRegressor(**params)
 
-            # ... Diğer modellerin parametre blokları (önceki kodun aynısı) ...
-            # Buraya kodun kısalmaması için diğer modelleri eklemen gerekirse
-            # önceki versiyondan kopyalayabilirsin, değişen bir şey yok.
             elif model_name == "LightGBM":
                 params = {
                     "n_estimators": trial.suggest_int(
@@ -316,13 +328,22 @@ class IndustrialTrainer:
             else:
                 return float("inf")
 
+            # --- WRAPPER EKLENDİ ---
+            # Optimize ederken de log dönüşümü kullanmalıyız
+            wrapped_model = TransformedTargetRegressor(
+                regressor=model, func=np.log1p, inverse_func=np.expm1
+            )
+
             pipeline = Pipeline(
                 steps=[
                     ("preprocessor", create_preprocessor(self.cat_cols, self.num_cols)),
-                    ("model", model),
+                    ("model", wrapped_model),
                 ]
             )
 
+            # cross_val_score burada pipeline.predict kullanır.
+            # Pipeline.predict -> TransformedTargetRegressor.predict -> expm1(tahmin)
+            # Yani skorlama orijinal TL değerleri üzerinden yapılır (RMSE).
             scores = cross_val_score(
                 pipeline, self.X, self.y, cv=3, scoring="neg_mean_squared_error"
             )
@@ -337,17 +358,13 @@ class IndustrialTrainer:
     def _save_categorical_options(self):
         """Kategorik kolonlardaki benzersiz değerleri JSON olarak kaydeder."""
         options = {}
-        # Sadece eğitimde kullanılan kategorik kolonları al
         for col in self.cat_cols:
-            # unique değerleri al ve listeye çevir
             unique_vals = self.X[col].dropna().unique().tolist()
             options[col] = sorted(unique_vals)
 
-        # Dosyayı kaydet
         with open("categorical_options.json", "w") as f:
             json.dump(options, f, ensure_ascii=False)
 
-        # MLflow'a artifact olarak gönder
         mlflow.log_artifact("categorical_options.json")
         logger.info("✅ Kategorik seçenekler (metadata) MLflow'a kaydedildi.")
 
@@ -359,6 +376,7 @@ class IndustrialTrainer:
         with mlflow.start_run(run_name=f"Champion_{model_name}_Optimized"):
             mlflow.log_param("target_col", self.target_col)
             mlflow.log_params(params)
+            mlflow.log_param("log_transform", True)
 
             if model_name == "XGBoost":
                 model = XGBRegressor(**params)
@@ -377,10 +395,15 @@ class IndustrialTrainer:
             else:
                 return
 
+            # --- FİNAL MODEL SARMA ---
+            wrapped_model = TransformedTargetRegressor(
+                regressor=model, func=np.log1p, inverse_func=np.expm1
+            )
+
             pipeline = Pipeline(
                 steps=[
                     ("preprocessor", create_preprocessor(self.cat_cols, self.num_cols)),
-                    ("model", model),
+                    ("model", wrapped_model),
                 ]
             )
 
@@ -389,13 +412,13 @@ class IndustrialTrainer:
             self._evaluate_and_log(
                 pipeline, X_train, y_train, X_test, y_test, prefix="Champion"
             )
-            # --- YENİ: Metadata Kaydı ---
             self._save_categorical_options()
 
             signature = mlflow.models.infer_signature(X_test, pipeline.predict(X_test))
 
-            # --- 1. MODELİ KAYDET (REGISTER) ---
-            # Bu işlem modeli 'RFS_Laptop_Price_Predictor' adıyla kaydeder (v1, v2...)
+            # --- MODELİ KAYDET ---
+            # Kaydedilen model artık bir "TransformedTargetRegressor" pipeline'ıdır.
+            # Yüklendiğinde otomatik olarak expm1 uygular.
             model_info = mlflow.sklearn.log_model(
                 pipeline,
                 "model",
@@ -403,9 +426,7 @@ class IndustrialTrainer:
                 registered_model_name="RFS_Laptop_Price_Predictor",
             )
 
-            # --- 2. ALIAS ATAMA (ETİKETLEME) ---
-            # Kaydedilen son versiyonu alıp ona '@champion' etiketini yapıştırıyoruz.
-            # API (FastAPI) bu etiketi takip edecek.
+            # --- ALIAS ATAMA ---
             client = MlflowClient()
             model_version = model_info.registered_model_version
             client.set_registered_model_alias(

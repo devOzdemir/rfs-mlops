@@ -17,10 +17,18 @@ from src.rfs.features.pipeline import LaptopETLPipeline
 # 2. Training Modülü
 from src.rfs.models.train import IndustrialTrainer
 
-# --- AYARLAR (Host Makine) ---
-VENV_PYTHON_PATH = "/Users/erwin/Developer/ml-dl/rfs-mlops/.venv/bin/python"
-PROJECT_PATH = "/Users/erwin/Developer/ml-dl/rfs-mlops"
+# --- AYARLAR (.env Dosyasından Okuma) ---
+VENV_PYTHON_PATH = os.getenv("VENV_PYTHON_PATH")
+PROJECT_PATH = os.getenv("PROJECT_PATH")
+SSH_CONN_ID = os.getenv("MAC_SSH_NAME", "my_local_mac")  # Varsayılan: my_local_mac
 SCRIPT_NAME = "run_scraping.py"
+
+# Hata Önleme: Eğer .env okunamazsa DAG hata versin (Gözden kaçmasın)
+if not VENV_PYTHON_PATH or not PROJECT_PATH:
+    raise ValueError(
+        "❌ KRİTİK HATA: 'VENV_PYTHON_PATH' veya 'PROJECT_PATH' ortam değişkeni bulunamadı! "
+        "Lütfen .env dosyanızı ve docker-compose.yaml dosyasını kontrol edin."
+    )
 
 default_args = {
     "owner": "rfs_team",
@@ -52,8 +60,11 @@ def run_model_training():
     print("🧠 Model Eğitimi Başlıyor...")
 
     # Docker içinde MLflow tracking URI'yı set edelim
-    # Bu ayar train.py içindeki 'localhost' ayarını ezer.
-    os.environ["MLFLOW_TRACKING_URI"] = "http://rfs_mlflow:5000"
+    # Eğer .env'de tanımlıysa oradan al, yoksa varsayılan Docker servisine git
+    tracking_uri = os.getenv("MLFLOW_TRACKING_URI", "http://rfs_mlflow:5000")
+    os.environ["MLFLOW_TRACKING_URI"] = tracking_uri
+
+    print(f"📡 MLflow URI: {tracking_uri}")
 
     try:
         trainer = IndustrialTrainer()
@@ -104,9 +115,10 @@ with DAG(
     start_pipeline = DummyOperator(task_id="start")
 
     # --- 1. SCRAPING (SSH - Host Makine) ---
+
     scrape_hb = SSHOperator(
         task_id="scrape_hepsiburada",
-        ssh_conn_id="my_local_mac",
+        ssh_conn_id=SSH_CONN_ID,
         command=f"""
             export DISPLAY=:0 && 
             cd {PROJECT_PATH} && 
@@ -120,7 +132,7 @@ with DAG(
 
     scrape_ty = SSHOperator(
         task_id="scrape_trendyol",
-        ssh_conn_id="my_local_mac",
+        ssh_conn_id=SSH_CONN_ID,
         command=f"""
             export DISPLAY=:0 && 
             cd {PROJECT_PATH} && 

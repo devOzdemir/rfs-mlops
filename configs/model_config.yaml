@@ -45,8 +45,8 @@ data_config:
 # --- Eğitilecek Modeller ---  
 benchmark_models:
   - "LinearRegression"
-  - "Ridge"
-  - "Lasso"
+  #- "Ridge"
+  #- "Lasso"
   - "RandomForest"
   - "ExtraTrees"
   - "XGBoost"
