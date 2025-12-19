@@ -92,7 +92,7 @@ with DAG(
     dag_id="03_rfs_demo_presentation",
     default_args=default_args,
     description="SUNUM MODU: DB Yok! Scraping -> CSV -> ETL -> CSV",
-    schedule_interval=None,
+    schedule_interval=timedelta(hours=2),
     start_date=datetime(2025, 1, 1),
     catchup=False,
     tags=["demo", "no-db", "presentation"],
